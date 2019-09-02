@@ -1,0 +1,75 @@
+Notes for assignment3
+config.h : configs the malloc lab  driver
+fsecs time packages (wrapper functions)
+clock for accessing alpha and mac cycle memlib models the heap and sbreak
+
+countersfcyc converts clocks to time in seconds
+
+
+these are your allocation request variables inside trace_t structure
+sugg_heapsize;   /* suggested heap size (unused) */
+num_ids;         /* number of alloc/realloc ids */
+num_ops;         /* number of distinct requests */
+traceop_t *ops;      /* array of requests */
+char **blocks;       /* array of ptrs returned by malloc/realloc... */
+size_t *block_sizes; /* ... and a corresponding array of payload sizes */
+/*
+Holds the params to the xxx_speed functions, which are timed by fcyc. 
+ * This struct is necessary because fcyc accepts only a pointer array
+ * as input.
+ */
+
+typedef struct {
+    trace_t *trace;  
+    range_t *ranges;
+
+
+} speed_t;
+
+stats_t :Summarizes the important stats for some malloc function on some trace
+This structure has following attributes:
+secs: number of seconds to execute
+ops: number of malloc/free/ realloc  operations
+valid: is the trace valid
+util: (defined only for  our package ) to see how much utility/importance we give to space utilization vis-s vis throughput
+default value is zero set for libc malloc/free/realloc
+three global variables:
+verbose : whether detailed or small description of the errors
+int errors: to measure the number of errors involved
+msg : it is a string which  holds error message which can be printed if required
+tracedir: is a string which stores  the default directory where we have to look for trace files
+
+
+filename of traced files are stored in char *  default_tracefiles []
+may update them
+To modify the range lists add_ range, remove_range, clear_range are used.
+static int add_range(range_t **ranges, char *lo, int size, 
+		     int tracenum, int opnum);
+static void remove_range(range_t **ranges, char *lo);
+static void clear_ranges(range_t **ranges);
+
+
+you need some place to hold your trace files and of trace files are changed.
+static trace_t *read_trace(char *tracedir, char *filename);
+static void free_trace(trace_t *trace);
+
+
+to check whether standard libc malloc itsef is workimg fine.
+static int eval_libc_valid(trace_t *trace, int tracenum);
+static void eval_libc_speed(void *ptr);
+similar check is required for student program
+eval_mm_valid( *trace, tracenum, range_t \\\\**ranges);
+eval_mm_util( *trace, int tracenum, range_t **ranges);
+ eval_mm_speed( *ptr);
+
+Some helper functions which are useful:
+
+
+printresults( n,  *stats);
+usage();
+unix_error(c *msg);
+malloc_error( tracenum,  opnum,  *msg);
+app_error(*msg);
+
+
+look out for usage called, at strange places

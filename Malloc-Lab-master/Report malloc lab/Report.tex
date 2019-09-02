@@ -1,0 +1,275 @@
+\documentclass[a4paper]{article}
+\newcommand\tab[1][1cm]{\hspace*{#1}}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{csquotes}
+\usepackage[unicode]{hyperref}
+\usepackage[]{algorithm2e}
+\usepackage{setspace}
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{enumitem}
+\usepackage[utf8]{inputenc}
+\usepackage{fancyhdr}
+ 
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Thanh Luong - Dat Thanh}
+\lhead{Malloc Lab}
+\rfoot{Page \thepage}
+\onehalfspacing
+
+\lstdefinelanguage{C}
+  {morekeywords={@catch,@class,@encode,@end,@finally,@implementation,%
+      @interface,@private,@protected,@protocol,@public,@selector,%
+      @synchronized,@throw,@try,BOOL,Class,IMP,NO,Nil,SEL,YES,_cmd,%
+      bycopy,byref,id,in,inout,nil,oneway,out,self,super,%
+      @dynamic,@package,@property,@synthesize,re	adwrite,readonly,%
+      assign,retain,copy,nonatomic%
+      },%
+}%
+\lstset{language = C, keywordstyle=\color{blue}\ttfamily,basicstyle=\tiny, commentstyle= \color{gray}}
+
+\usepackage[utf8]{inputenc}
+\lstset{    breaklines=true,}
+
+\begin{document}
+\title{CS201\\REPORT: MALLOC LAB}
+
+\author{<MSSV> - <Your Name>}
+\author{1551020 - Vo Tran Thanh Luong - 1551031 - Dinh Dat Thanh}
+\maketitle
+
+\pagenumbering{roman}
+
+\setcounter{page}{1}
+\tableofcontents
+\pagenumbering{arabic}
+
+\clearpage
+
+% Start your report here
+
+\begin{displayquote}
+
+Warning : the codes I input in this report are for descriptive reason only. I keep them tiny because normal size would make them spam in the report.  They are all extracted from the main source code file. Although they are still readable here, I highly recommend viewing them in the main source code file.
+\end{displayquote}
+
+\section{Theory and Method Chosen}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{}  
+
+There are many ways to solve this lab assignment as we have learnt about ways to keep track of free blocks. There are 3 ways mentioned : implicit free list, explicit free list, and segregated free list, but for the sake of higher throughput and better memory optimization, we opt for segregated free list.  (space efficiency and speed efficency)
+
+\section{Our Mission}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{}  
+At first glance, we can obviously expect what we need to do : malloc():  reserve a block of memory, free():  release a chunk of memory, realloc():  resize a reserved chunk. In details :
+\newline  
+
+{\bf int mm\_init(void)}\newline
+	{\it  \tab Will be called by the trace-driven program in order to perform necessary \tab initializations\newline
+	\tab	\tab ie. allocating initial heap area\newline
+	\tab Return -1 if an error occurs and 0 if otherwise\newline }
+
+{\bf void \*mm\_malloc(size\_t size)}\newline
+	{\it \tab Returns pointer to an allocated block payload of at least size bytes\newline
+	\tab Block must lie within heap area\newline
+	\tab Block cannot overlap with another allocated chunk\newline
+	\tab Must return 8-byte aligned pointer\newline }
+
+{\bf void mm\_free(void \*ptr)}\newline
+	{\it\tab Frees the block pointed to by ptr\newline
+	\tab Returns nothing\newline}
+
+{\bf void \*mm\_realloc(void \*ptr, size\_t size)}\newline
+	{\it \tab If ptr is NULL, call mm\_malloc(size)\newline
+	\tab If size==0, call mm\_free(ptr)\newline
+	\tab If otherwise, change the size of the block of memory pointed to by ptr to \tab size bytes and returns the address of this new block\newline
+		\tab \tab Possible for this address to remain the same as for the old block\newline
+		\tab\tab\tab ie:  if a consecutive block of memory is free and satisfies the \tab \tab \tab given size requirement\newline 
+		\tab \tab Contents of memory block remain the same (as much as possible \tab \tab if allocating to a smaller size block)\newline }
+
+
+
+\section{Preparation}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{}   
+The memlib.c package simulates the memory system for your dynamic memory allocator. You can invoke
+the following functions in memlib.c:    
+  \newline   
+  
+ {\bf void \*mem sbrk(int incr)}: Expands the heap by incr bytes, where incr is a positive non-zero integer and returns a generic pointer to the first byte of the newly allocated heap area. The semantics are identical to the Unix sbrk function, except that mem sbrk accepts only a positive non-zero integer argument.  \newline  
+ 
+  {\bf void \*mem heap lo(void)}: Returns a generic pointer to the first byte in the heap.    \newline  
+  
+  {\bf void \*mem heap hi(void)}: Returns a generic pointer to the last byte in the heap.  \newline  
+  
+   {\bf size t mem heapsize(void)}: Returns the current size of the heap in bytes.    \newline  
+   
+   {\bf size t mem pagesize(void)}: Returns the system’s page size in bytes (4K on Linux systems) \newline  
+   
+
+We will use sbrk as our main tool to implement malloc. All we have to do is to acquire more space (if needed) to fulfil the query.  
+
+First question that comes to our mind is that how do we represent the block information. As we are using segregated freelist, it is crucial that we need to include a small block at the beginning of each data chunk for the metadata (header, footer, pointer). Translating this idea into code, however, is a very hard problem. Initially, we tried with struct as each struct will represent a block of memory for metadata. Problem comes when we realized that create a struct without a working malloc is too hard so we selected another approach : define a bunch of macros.  
+
+Our macro comprises of :
+\newline  
+
+1. {\bf Alignment  8}. {\it It is often required that pointers be aligned to the integer size. We are doing this lab on a 64 bit machine so our pointer must be a multiple of 8. Therefore, the alignment macro here is equal to 8, as the size of data block. 
+\newline  }
+
+2. {\bf ALIGN(size) (((size) + (ALIGNMENT-1)) \& \~ 0x7)}. {\it       The alignment size that malloc need to create may not be a multiple of 8. However, the way blocks of memory work requires us to make it an multiple of 8 ( even if it is bigger than the size we need, size + padding ), thus our job is to find the nearest multiple of 8 of the size we need to align. This is simple and can be done by a bitwise trick. Let X be an integer such that X = 8 * p + q ( with q from 0 to 7 ). We have the formula (X+7) - ((X+7) - (X+7)/8 * 8)  which always results in the nearest mulitple of 8 of X. Expressing it in bitwise is as the above definition.}
+\newline  
+
+3. {\bf SIZE\_T\_SIZE (ALIGN(sizeof(size\_t)))} :{\it define size\_t size parameter.}
+\newline  
+
+4. {\bf WSIZE 4 }.{\it Word size equals to 4 ( 4 bytes for header and footer) }
+\newline  
+
+5. {\bf DSIZE 8 }.{\it Double word size equals to 8.}
+\newline  
+
+6. {\bf INITCHUNKSIZE (1 \textless  \textless 6)} {\it (2 to the power of 6 is 64) the size of the initial free block.} 
+\newline  
+
+7. {\bf CHUNKSIZE (1 \textless  \textless 12) } {\it (2 to the power of 12) the default size for expanding the heap. }
+\newline  
+
+8. {\bf LIST 20} .{\it size of segregated list = 20.}
+\newline  
+
+9. {\bf  REALLOC\_BUFFER  (1  \textless  \textless 7) } .{\it size of realloc buffer : 2 to the power of 7. }
+\newline  
+
+10. {\bf MAX(x, y) ((x)  \textgreater (y) ? (x) : (y)) } {\it A macro to decide the bigger number between 2 numbers. }
+\newline  
+
+11. {\bf MIN(x, y) ((x)  \textless (y) ? (x) : (y))} {\it  A macro to decide the smaller number between 2 numbers.}
+\newline  
+
+12. {\bf PACK(size, alloc) ((size) \textbar (alloc))} {\it Pack a size and allocate it into a word. }
+\newline  
+
+13. {\bf GET, PUT, PUTNOTAG } {\it are all actions to read , return or write a word at address p. PUT differs from PUTNOTAG that PUT also takes the tag ( which is the second bit of the last 2 bits ).  
+\newline  }
+
+14. {\bf  SET\_PTR(p, ptr) (\*(unsigned int \*)(p) = (unsigned int)(ptr)) } {\it  Store predecessor or successor pointer for free blocks.}
+\newline  
+
+15. {\bf GET\_SIZE(p)  (GET(p) \& \~ 0x7) } {\it because except the last 3 tags, the remainder is the size. }
+\newline  
+
+16. {\bf  GET\_ALLOC(p) (GET(p) \& 0x1) } {\it in the last 2 bits, the outmost bit is the bit that show whether the block is allocated or not. }
+\newline  
+
+17. {\bf GET\_TAG(p)   (GET(p) \& 0x2) } {\it gets the tag from the last 2 bits. }
+\newline  
+
+18. {\bf SET\_RATAG(p)   (GET(p)  \textbar = 0x2) }  {\it set reallocated tag.}
+\newline  
+
+19. {\bf REMOVE\_RATAG(p) (GET(p) \& = \~ 0x2) } {\it  remove reallocated tag. }
+\newline  
+
+20. {\bf  HDRP(ptr) ((char \*)(ptr) - WSIZE) and  FTRP(ptr) ((char \*)(ptr) + GET\_SIZE(HDRP(ptr)) - DSIZE) } {\it returns the address of header and footer when given a pointer that points to a block- or a pointer that points to the first payload. }
+\newline  
+
+21.{\bf NEXT\_BLKP(ptr) ((char \*)(ptr) + GET\_SIZE((char \*)(ptr) - WSIZE)) and PREV\_BLKP(ptr) ((char \*)(ptr) - GET\_SIZE((char \*)(ptr) - DSIZE)) } {\it returns the address of next and previous blocks when given a pointer that points to the block.  }
+\newline  
+
+22.{\bf PRED\_PTR(ptr) ((char \*)(ptr) and  SUCC\_PTR(ptr) ((char \*)(ptr) + WSIZE) } {\it returns the address of next and previous FREE BLOCKS when given a pointer that points to the block.  }
+\newline  
+
+23. {\bf PRED(ptr) (\*(char \*\*)(ptr)) and SUCC(ptr) (\*(char \*\*)(SUCC\_PTR(ptr))) } {\it returns the address of the next and previous block on the segregated list. }
+
+\section{MMinit}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{} 
+ 
+First of all, we need to create a heap with an initial free block using mm\_init. 
+\lstinputlisting[language=C]{SourceCode/mminit.c}    
+
+Because we are using segregated free list, we need to initialize the segregated free list (with all value NULL). Then, we allocate the heap. There are cases when initialization problems happen and it should return -1. If everything is okay, the mm\_init function gets four words from the memory and initialize them to create the empty free list. After that it calls the extend heap function, which extends the heap by the CHUNKSIZE bytes and creates the initial free block. There are two cases when the extend\_heap function is invoked  one is when the heap is initialized, and another is when mm\_malloc is unable to find a suitable fit. The purpose of extend\_heap is to round up the requested size to the nearest multiple of 8 (which is 2 words) then request additional heap space from the memory if neccessary. We need to notice that the heap begins on a double-word aligned boundary, and every call to extend\_heap returns a block whose size is an integral number of double words. Thus, every call to mem\_sbrk returns a double-word aligned chunk of memory immediately following the header of the epilogue block. This header becomes the header of the new free block, and the last word of the chunk becomes the new epilogue block header.  The extend heap function should also insert free node at the pointer position into the segregated list.
+
+\lstinputlisting[language=C]{SourceCode/extendheap.c} 
+  
+  
+Inside the insert node function we find a good position by traversing the list. There are 3 cases :insert between the list, insert at the beginning at the list or insert at the end of the list. We uitilizes all the SETPTR macro that has been predefined. This operations is very simple and similar to a linked list.  
+
+
+\lstinputlisting[language=C]{SourceCode/insertnode.c}
+ 
+\section{MMMaloc}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{} 
+Now we do our malloc function. In our malloc function, we define the block size that need to be alligned. Then we traverse the segregated free list and find the appropriate one, which is the smallest different size block (because the list is from large to small size, after everyloop we drop one bit in the search size) . If the appropriate  block is found(fit), we place the block to the memory. If no appropriate block is found (not fit), we extend the heap and place the requested block in the new free block. If the heap cannot be extended, then we return null. If everything is successful, we return the pointer that points to the allocated block. Also note that we use the helper function place to help place the block to the memory. In this function, we took a free block from the list then bascially use it. But the problem here is to decide whethere to split or not to prevent losing a lot of spaces.  When a chunk is wide enough to held the asked size plus a new chunk, we split it and put the allocated block at the end of the free block then insert the remaining free block back to the segregated free list. These are all done thanks to the PUT macro that  we predefinde to write a word at a address ( either with tag or without tag ). You may have cared what the delete node function do. This function delete the node in the segregrated free list to input.  It operates just like when we delete a node from a linked list, we modify the pointers to that node. Here we modify the next and the prev pointers, which mean we need to know where the current node is.
+
+
+\lstinputlisting[language=C]{SourceCode/mmmaloc.c} 
+
+ 
+\section{MMFree}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{} 
+MMfree free a block then connect it with other free blocks. Here we are applying segregated free list so we will implement the way that segregated free list coalesce  free block. Freeing a block is simple as we remove the reallocated tag from it, put new info about header and footer in it to confirm it is now free, then put the free block into the segregated free list. The coalesce function check if the next and the previous block is reallocated. If the prev block is reallocated do not coalese. If both the prev and the next are not free, do not coalesce. We can only coalesce in three case : either the next or the prev is not allocated or both of them are free. Simple put the pointers to their right places and define the new free size. With this new size, we also need to find a proper place to put on the segregated free list.  
+
+\lstinputlisting[language=C]{SourceCode/mmfree.c} 
+
+\section{MMRealloc}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{}
+
+The most naiive approach is to  reallocate a new block of the given size using malloc, copy data from the old one to the new one and free the old block. But here we do something different a little bit. Instead of purely copy the data, we extend the current data size to fit the new requirements. First we check if the size of the new block is smaller than a double word size. If yes then the new size needed will fit in a space that is double the old size. If not, we need to add the double word size to the old size and then round up to the multiple of 8 ( by using ALGIN ). After that we need to add overhead requirement for block size and calculate the block buffer. When there is not enough space for the new block size, we check if the next block is free or the epilogue block fo the next block. If the next block is free, we check if the next block free size + the current block size is enough to make up space for the new block size. IF there is still not enough space, we need to extend the heap. IF there is now enough space, we delete the next free block from the segregated list and put value in.  In case there the next block is not free, it is fine for us now to alloc a new size and copy the old data into new place using memcpy ( as the naiive approach ). After all of this, it is also imperative that we set  the reallocation tag and then return the reallocation block.
+
+\lstinputlisting[language=C]{SourceCode/mmrealloc.c} 
+
+\paragraph{}
+
+
+
+\section{Team Credit}
+\noindent\rule{2cm}{0.4pt}
+
+\paragraph{}
+Dinh Dat Thanh : 
+\newline
+\tab \tab \tab Set basic idea and theory (segregated free list)  
+\newline
+\tab \tab \tab MM Alloc \& helper functions
+\newline
+\tab \tab \tab MM Free \& helper functions
+\newline
+\tab \tab \tab Debug files
+
+Vo Tran Thanh Luong : 
+\newline
+\tab \tab \tab Enhance idea (segregated free fits list)
+\newline
+\tab \tab \tab MM Realloc
+\newline
+\tab \tab \tab Report Writing
+
+Both: 
+\newline
+\tab \tab \tab Cross code checking
+\tab \tab \tab Mutual explaination
+
+\paragraph{}
+
+\section{Thank you note}
+\noindent\rule{2cm}{0.4pt}
+\paragraph{}
+Thank you Prof Nghiem Quoc Minh and our TAs for having introduced the basis of memmory allocation.
+
+\end{document}  
+
+
+
+
+
+
+
+
