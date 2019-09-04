@@ -144,10 +144,17 @@ Free (pointer to the allocated block):
 
 			
 Realloc:
-	three sequential actions:
-	1)store the data in temproary buffer (they are using memset in mdriver.c, please study that)
-	2) free the allocated block
-	3) allocate a new block and copy the data.
-	
-
-	
+	check whether nextblock to this request is free and will help in accomodating the entire block.
+	how to check:
+	payload in current block + payload of next block  <= new payload
+	if yes:
+		use that free block . no need to initialize that block. just change its footer with new size and change allocated bit to 1
+	if no: 
+		copy the data in some array, call mm_free on this block and mm_malloc with thisnew array. they are checking for this error.
+ 
+		
+	I have one question though:
+		1) if we go in a particular range say 512-1024 and do not find the contiguous  block should we keep looking in further
+		 blocks(1025-2048) I think we should becuase having the next free block is more beneficial than allocating a new plac
+		e altogether to avoid copying(copying is very slow).
+		
