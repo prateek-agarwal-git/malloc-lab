@@ -73,3 +73,81 @@ app_error(*msg);
 
 
 look out for usage called, at strange places
+
+
+implementation:
+
+1) Implicit is linear in the number of total blocks
+2) explicit is linear in the number of free blocks
+3) doubly linked list free blocks with links stored in the blocks itself
+minimum size of a block:
+we are using explicit free list. so all overheads are in free block.free block should include the following information:
+1) header: size and whether it is free or allocated(4 bytes)
+2)previous pointer : pointing to the previous free block(8 bytes)
+3) next pointer : pointing to the next free block
+4) footer: size and whether it is free or allocated(4 bytes)
+so minimum size of any allocated block is 24 bytes. 
+
+We will not use implicit free list because its time complexity is linear in the number of all blocks(free and occupied) and not in the 
+number of free blocks.
+
+Segregated fits: we shall start with powers of 2. i.e. 
+There will be an array A of pointers to this list.
+2) A[0] = will have a head pointing to any one block in the range [1..2] (both inclusive)
+3) A[1] = will have a head pointing to any one block in the range [3..4] (both inclusive)
+4) A[2]= will have a head pointing to any one block in the range [5..8] (both inclusive)
+5) A[3] = will have a head pointing to any one block in the range [9..16] (both inclusive)
+and so on.Let us start with these sizes and see how it goes.
+
+Malloc(size):
+  A block of a given size "S" is required(size includes payload and not overheads).
+	if S is less than 16:
+ 		 we will allocate 24 bytes
+		1)header: 4 bytes
+		2) footer : 4 bytes 
+		3 payload or free bloc information
+	if S is greater than 16:
+		we will allocate S + 8+ padding:
+		1) S + padding : for storing payload and alignment
+		2) 8 bytes : for header and footer information
+	This allocation can be from two places:
+	1) free blocks
+	2) sbreak (when high water mark is reached and no place in our arena).
+	a)free blocks: should  we split the block or ignore internal fragmentation?
+			( i think we will have to. ex: allocate 1000 bytes, free it, allocate 10 bytes, we
+			 have to make a block of 990 bytes here)
+			So we will choose the block and allocate it and make a new free block 
+			if its size is more than 24 bytes and put it in appropriate free block. 
+			It will be a constant time operation if put it near the head.
+	b) sbreak : this should be easy just increase it to appropriate size. 
+	
+Free (pointer to the allocated block):
+	Two sequential actions to be performed:
+	1)colaesce:
+		check whether the previous and next blocks are free or not.
+		a) previous is free and next is not:
+			sum up the sizes and remove previous block from 
+			its segregated free list(it will be easy as we have a doubly linked list.
+			size = size of previous block + size of this block + 8 bytes 
+			as there are two headers and footers in 2 blocks, we need only a single pair)
+		b) next is free and previous is not: similar logic as above. replace previous by next in above
+		c) both are free:
+			size = size of previous + size of this +size of next block + 16 bytes( 3 header-footer pairs, we need only one) 
+		d) none of them is free: 
+			move to step 2
+		
+		2)put it in appropriate segregated free list:
+			Now we have the size. we should use one of the pointers from array A described above to point to this block.
+			according to size. this should be easy as we know the pattern.
+			if it is in the range 2^ k + 1 to 2^ (k+1)(both inclusive) we should use A[k].
+			exception: 2^0 to 2^1 : first block we can discuss that
+
+			
+Realloc:
+	three sequential actions:
+	1)store the data in temproary buffer (they are using memset in mdriver.c, please study that)
+	2) free the allocated block
+	3) allocate a new block and copy the data.
+	
+
+	
