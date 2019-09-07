@@ -21,20 +21,21 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 //ALERT : see all the alerts
 #define GETHEADER(bp) (*bp) 
-#define GETSIZEHEADER(bp) (*(size_t *) bp & ~1)
-// get previous free block. stored in current free block
-#define GETPREVFREE(bp) (bp+sizeof(void*))
+#define GETSIZEHEADER(bp) (*(size_t *) bp & ~0x1)
+// address of  previous free block. stored in current free block
+#define GETPREVFREE(bp)*(void *) (bp+SIZE_T_SIZE)
 //get next free block from current free block
-#define GETNEXTFREE(bp) (bp+SIZE_T_SIZE+sizeof(void*))
+#define GETNEXTFREE(bp)* (void *)  (bp+SIZE_T_SIZE+ALIGN(sizeof(void*)))
 // this macro is used for checking the last bit of the block used in colaescing
 #define GETFOOTER(bp)((bp + GETSIZEHEADER(bp)- SIZE_T_SIZE))
-#define MINSIZE (2*SIZE_T_SIZE + ALIGN(2*sizeof(void *)))
+#define MINSIZE (2*SIZE_T_SIZE +2* ALIGN(sizeof(void *)))
 
 // get two macros are used for colaescing.
 #define SETALLOCBITHEADER(bp) ((*(size_t *) bp)|= 0x1)
 #define SETALLOCBITFOOTER(bp) ((*(size_t *)GETFOOTER(bp))|=0x1 )
 //our heap
 static char * mm_heap;
+static char *mm_head;
 // seglist contains pointer to free blocks according to their size classes. seglist[0] will map to block of 
 //size 1, [1] to 2, [2] to 3-4, [3] to 5-8
 static char * mm_seglist[36];
@@ -45,22 +46,23 @@ void colaesce(void * bp);
 // not using init as of now. may be required for storing dummy head/ dummy tail
 int mm_init(void)
 {
-	 return 0;
+	//make a dummy head node for free list
+	size_t minsize = MINSIZE;
+	mm_head =mem_sbrk(MINSIZE);
+	assert(minsize%2==0);
+	memcpy(mm_head,&minsize,sizeof(size_t));//header
+	memcpy(mm_head+minsize-SIZE_T_SIZE,&minsize, sizeof(size_t));//footer
+	memcpy(mm_head + SIZE_T_SIZE, NULL, sizeof(void *));//prev
+	memcpy(mm_head + SIZE_T_SIZE+ALIGN(sizeof(void *)),NULL, sizeof(void *));//next
+	return 0;
 }
 
 void *mm_malloc(size_t payload)
 {
 	size_t size = ALIGN(payload+2*SIZE_T_SIZE);
 	if (size<MINSIZE) size  = MINSIZE;
-	size_t temp = size;
-	int seg_index = 0;
-	while (temp!=0){
-		temp = (temp>>1);
-		seg_index++; 
-	}
 	void * block_pointer;
-	
-	block_pointer =search_free_block(seg_index,size); 
+	block_pointer =search_free_block(size); 
 	if (block_pointer != NULL){
 		SETALLOCBITHEADER(block_pointer);
 		SETALLOCBITFOOTER(block_pointer);
@@ -70,7 +72,7 @@ void *mm_malloc(size_t payload)
 	if (block_pointer == (void *) -1) return NULL;
 	size = size|0x1;
 	memcpy(block_pointer, &size, sizeof(size_t));
-	block_pointer = block_pointer + size - SIZE_T_SIZE;
+	block_pointer = block_pointer + size - SIZE_T_SIZE-1;
 	memcpy(block_pointer, &size, sizeof(size_t));
 	return block_pointer;
 }
@@ -88,15 +90,16 @@ void colaesce(void *bp){
 	if (physicalprev && physicalnext) return;
 	else if (physicalprev && !physicalnext){
 		//combine with next block
-		//alert delete from seglist
-		/*
-			temp.prev.next = temp.next
-			temp.next.prev = temp.prev
-		*/
+		//alert delete from freelist
 		size_t newfreesize = GETSIZEHEADER(bp) +(physicalnextsize &~0x1);
 		memcpy(bp, &newfreesize, sizeof(size_t));
 		memcpy(bp + newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-		 
+		 //alert: insert into freelist
+	/*
+
+
+
+	*/ 
 
 
 	}
@@ -126,9 +129,7 @@ void colaesce(void *bp){
 }
 void *mm_realloc(void *ptr, size_t payload)
 {
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
+    
     //copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
     //if ​ ptr​ is NULL, the effect of the call is equivalent to mm_malloc(size);
 	if (ptr == NULL) return mm_malloc(payload);
@@ -140,80 +141,77 @@ void *mm_realloc(void *ptr, size_t payload)
 	size_t size = ALIGN(payload+2*SIZE_T_SIZE);
 	if (size<MINSIZE) size  = MINSIZE;
 
+	size_t currentsize = GETSIZEHEADER(ptr)-1; 
+	if (size == currentsize){
+		return ptr;
+	}
 
-	if (size == GETSIZEHEADER(ptr)){
-	return ptr;
-	} 
+	if (size < currentsize )){
+		size_t remaining = currentsize - size;
+		size = size+1;
+		size_t newsize = size -1;
+		memcpy(ptr,&size, sizeof(size_t );
+		memcpy(ptr+newsize- SIZE_T_SIZE, &size, sizeof(size_t));
+		size = size-1;;
+		//insert into seglist
+		if (remaining >= MINSIZE){
+			//setting header and footer of the freed block
+			memcpy(ptr+newsize,&remaining, sizeof(size_t)  );
+			memcpy(ptr +currentsize -SIZE_T_SIZE ,&remaining, sizeof(size_t));
+		
+			//alert : insert into free list
+		}
+		return ptr;			
+	}
+ 	size_t physicalnextsize = *(size_t *)(bp +currentsize);
+	if ((physicalnextsize%2 == 0) &&(physicalnextsize+currentsize)>= size)){
+		size_t remaining = physicalnextsize+currentsize - size;
+		size_t blocksize = size;
+		size = size+1;
+		memcpy(ptr,&size, sizeof(size_t ));
+		memcpy(ptr+blocksize- SIZE_T_SIZE, &size, sizeof(size_t));
+		if (remaining > MINSIZE){
+		assert(remaining%2==0);
+		memcpy(ptr+blocksize,&remaining, sizeof(size_t)  );
+		memcpy(ptr +blocksize + remaining -SIZE_T_SIZE ,&remaining, sizeof(size_t));
+		//alert: insert into free list
+		}
+		return ptr;
 
 
-	/*
-	if size < GETSIZEHEADER(ptr):
-		1) set header with new size
-		2) set footer of allocated block with new size
-		3)  if remaining size is greater than MINSIZE:
-			a) set header
-			b) set footer
-			c) send it for insertion into seglist
-		else:
-			do nothing	
-		RETURN old pointer
-	*//*
+	}	
+	else{
+		void * newptr = mm_malloc(size);
+		if (newptr == NULL){
 
-
-
-	if (next physical block is free and  GETSIZEHEADER(ptr) + GETSIZEHEADER(NEXTFREEBLOCK) >= size)): 
-		a)change header with new size (and allocate bit to 1)
-		b)change footer (by calculating its from header) and put new size and set bit to 1
-		c)return old pointer
-	else:
-		call malloc with size into new ptr;
-		copy the contents from old ptr to new ptr;
-		mm_free(oldptr)
-
-	*/
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-
-    return newptr;
+		return  NULL;//check this or void * -1;
+		}
+		memcpy(newptr,ptr,currentsize );
+		mm_free(ptr);
+		return newptr;
+	}  
+  	return ptr;
 }
 
-void * search_free_block(int index, size_t size){
-	while(index<36){
-		char * temp = mm_seglist[index];
-		while (temp!= 0){
-			//multiple getsizeheader
-
-			if (GETSIZEHEADER(temp) >=size){
-				//alert delete from seglist
-				/*
-					temp.prev.next = temp.next
-					temp.next.prev = temp.prev
-				*/
-				size_t remaining = GETSIZEHEADER(temp) - size;
-				if (remaining > MINSIZE){
-					void * newblock = temp+size;
-					memcpy(newblock, &remaining, sizeof(size_t));
-					void* footernewblock = newblock + remaining - SIZE_T_SIZE;
-					memcpy(footernewblock, &remaining, sizeof(size_t));
-
-					//alert: insert into seglist
+void * search_free_block(size_t size){
+	//implementing first fit
+	void * curr =GETNEXTFREE(mm_head);
+	while(curr!= NULL){
+		if (GETSIZEHEADER(curr)>= size){
 					/*
-						newblock.prev = NULL
-						newblock.next = seglist[index]
-						seglist[index] = newblock
-					
-
-					*/
-				}
-				return temp;
-			}
-			temp = GETNEXTFREE(temp);
+			temp.prev.next = temp.next
+			temp.next.prev = temp.prev
+		*/
+			void * prev = GETPREVFREE(curr);
+			void * next = GETNEXTFREE(curr);
+			memcpy(prev + SIZE_T_SIZE+ALIGN(sizeof(void *)),next, sizeof(void *));//next
+			if (next != NULL) memcpy(next + SIZE_T_SIZE, prev, sizeof(void *));//prev
+			return curr;
 		}
-		index++;
-
+		curr = GETNEXTFREE(curr);
+		
 	}
-	return NULL;
+	return NULL;	
 
 }
 
