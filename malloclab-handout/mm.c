@@ -94,7 +94,8 @@ void colaesce(void *bp){
 			temp.next.prev = temp.prev
 		*/
 		size_t newfreesize = GETSIZEHEADER(bp) +(physicalnextsize &~0x1);
-		memcpy(newblock, &remaining, sizeof(size_t));
+		memcpy(bp, &newfreesize, sizeof(size_t));
+		memcpy(bp + newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
 		 
 
 
@@ -123,20 +124,57 @@ void colaesce(void *bp){
 
 
 }
-void *mm_realloc(void *ptr, size_t size)
+void *mm_realloc(void *ptr, size_t payload)
 {
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;
-    
+    //copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    //if ​ ptr​ is NULL, the effect of the call is equivalent to mm_malloc(size);
+	if (ptr == NULL) return mm_malloc(payload);
+	if (payload == 0) {
+		mm_free(ptr);
+		return NULL;
+
+	}
+	size_t size = ALIGN(payload+2*SIZE_T_SIZE);
+	if (size<MINSIZE) size  = MINSIZE;
+
+
+	if (size == GETSIZEHEADER(ptr)){
+	return ptr;
+	} 
+
+
+	/*
+	if size < GETSIZEHEADER(ptr):
+		1) set header with new size
+		2) set footer of allocated block with new size
+		3)  if remaining size is greater than MINSIZE:
+			a) set header
+			b) set footer
+			c) send it for insertion into seglist
+		else:
+			do nothing	
+		RETURN old pointer
+	*//*
+
+
+
+	if (next physical block is free and  GETSIZEHEADER(ptr) + GETSIZEHEADER(NEXTFREEBLOCK) >= size)): 
+		a)change header with new size (and allocate bit to 1)
+		b)change footer (by calculating its from header) and put new size and set bit to 1
+		c)return old pointer
+	else:
+		call malloc with size into new ptr;
+		copy the contents from old ptr to new ptr;
+		mm_free(oldptr)
+
+	*/
     newptr = mm_malloc(size);
     if (newptr == NULL)
       return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
+
     return newptr;
 }
 
