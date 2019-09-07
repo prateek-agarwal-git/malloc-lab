@@ -158,3 +158,22 @@ Realloc:
 		 blocks(1025-2048) I think we should becuase having the next free block is more beneficial than allocating a new plac
 		e altogether to avoid copying(copying is very slow).
 		
+Coalesce
+
+
+/*
+
+
+	if (next physical block is free and  GETSIZEHEADER(ptr) + GETSIZEHEADER(NEXTFREEBLOCK) >= size)): 
+		a)change header with new size (and allocate bit to 1)
+		b)change footer (by calculating its from header) and put new size and set bit to 1
+		c) put the remaining free block into  freelist; 
+		d)return old pointer
+	else:
+		call malloc with size into new ptr;
+		copy the contents from old ptr to new ptr;
+		mm_free(oldptr)
+
+	*/
+
+
