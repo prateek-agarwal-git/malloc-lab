@@ -36,14 +36,9 @@ team_t team = {
 //our heap
 static char * mm_heap;
 static char *mm_head;
-// seglist contains pointer to free blocks according to their size classes. seglist[0] will map to block of 
-//size 1, [1] to 2, [2] to 3-4, [3] to 5-8
-static char * mm_seglist[36];
-// used in our  malloc to check for next free block(we will be using first fit). it returns starting pointer.
-void * search_free_block(int,size_t );
-//returns nothing. checks contiguous blocks in physical memory( not in our data structure for colaescing
-void colaesce(void * bp); 
-// not using init as of now. may be required for storing dummy head/ dummy tail
+void * search_free_block(size_t );
+void colaesce(void * bp);
+void insertfreelist(void * bp); 
 int mm_init(void)
 {
 	//make a dummy head node for free list
@@ -86,22 +81,12 @@ void colaesce(void *bp){
 	size_t physicalnextsize = *(size_t *)(bp +GETSIZEHEADER(bp));
 	size_t physicalprev = physicalprevsize & 0x1;
 	size_t physicalnext = physicalnextsize &  0x1;
-	//alloc = 1 , free = 0
 	if (physicalprev && physicalnext) return;
 	else if (physicalprev && !physicalnext){
-		//combine with next block
-		//alert delete from freelist
 		size_t newfreesize = GETSIZEHEADER(bp) +(physicalnextsize &~0x1);
 		memcpy(bp, &newfreesize, sizeof(size_t));
 		memcpy(bp + newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-		 //alert: insert into freelist
-	/*
-
-
-
-	*/ 
-
-
+		insertfreelist(bp);
 	}
 	else if (!physicalprev && physicalnext){
 
@@ -153,13 +138,11 @@ void *mm_realloc(void *ptr, size_t payload)
 		memcpy(ptr,&size, sizeof(size_t );
 		memcpy(ptr+newsize- SIZE_T_SIZE, &size, sizeof(size_t));
 		size = size-1;;
-		//insert into seglist
 		if (remaining >= MINSIZE){
 			//setting header and footer of the freed block
 			memcpy(ptr+newsize,&remaining, sizeof(size_t)  );
 			memcpy(ptr +currentsize -SIZE_T_SIZE ,&remaining, sizeof(size_t));
-		
-			//alert : insert into free list
+			insertfreelist((ptr+newsize));
 		}
 		return ptr;			
 	}
@@ -171,10 +154,10 @@ void *mm_realloc(void *ptr, size_t payload)
 		memcpy(ptr,&size, sizeof(size_t ));
 		memcpy(ptr+blocksize- SIZE_T_SIZE, &size, sizeof(size_t));
 		if (remaining > MINSIZE){
-		assert(remaining%2==0);
-		memcpy(ptr+blocksize,&remaining, sizeof(size_t)  );
-		memcpy(ptr +blocksize + remaining -SIZE_T_SIZE ,&remaining, sizeof(size_t));
-		//alert: insert into free list
+			assert(remaining%2==0);
+			memcpy(ptr+blocksize,&remaining, sizeof(size_t)  );
+			memcpy(ptr +blocksize + remaining -SIZE_T_SIZE ,&remaining, sizeof(size_t));
+			insertfreelist(ptr + blocksize);
 		}
 		return ptr;
 
@@ -198,10 +181,6 @@ void * search_free_block(size_t size){
 	void * curr =GETNEXTFREE(mm_head);
 	while(curr!= NULL){
 		if (GETSIZEHEADER(curr)>= size){
-					/*
-			temp.prev.next = temp.next
-			temp.next.prev = temp.prev
-		*/
 			void * prev = GETPREVFREE(curr);
 			void * next = GETNEXTFREE(curr);
 			memcpy(prev + SIZE_T_SIZE+ALIGN(sizeof(void *)),next, sizeof(void *));//next
@@ -215,6 +194,26 @@ void * search_free_block(size_t size){
 
 }
 
+void insertfreelist(void * bp){
+	
+	void *nexthead = GETNEXTFREE(mm_head);
+	memcpy(bp+SIZE_T_SIZE+ALIGN(sizeof(void*)),&nexthead,sizeof(void *) );//next of current
+	memcpy(mm_head + SIZE_T_SIZE+ALIGN(sizeof(void *)),bp, sizeof(void *));//next of head
+	memcpy(bp+SIZE_T_SIZE,mm_head,sizeof(void *) );//prev of current
+	return;
+}
+/*
+
+curr.next = dummy.next
+dummy.next = curr;
+curr.prev = dummy;
+
+*/
+
+					/*
+			temp.prev.next = temp.next
+			temp.next.prev = temp.prev
+		*/
 
 
 
