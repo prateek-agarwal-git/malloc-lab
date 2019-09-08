@@ -68,10 +68,8 @@ void mm_free(void *bp){
 		size_t physicalprevbool = physicalprevsize & 0x1;
 		if (physicalprevbool){
  			size_t currsize = GETSIZEHEADER(bp);
-			printf("%u", currsize);
 			memcpy(bp, &currsize, sizeof(size_t));
 			memcpy(bp +currsize - SIZE_T_SIZE, &currsize, sizeof(size_t));
-			printf("blockpointer= %lu\n, currsize = %lu\n, size_t_size = %lu\n, ",bp, currsize, SIZE_T_SIZE );
 			insertfreelist(bp,mm_head);
 			return;//both are allocated
 		}
