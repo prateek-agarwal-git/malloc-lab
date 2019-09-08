@@ -23,8 +23,8 @@ team_t team = {
 #define GETHEADER(bp) (*bp) 
 #define GETSIZEHEADER(bp)((*(size_t *)bp) &= ~0x1)
 // address of  previous free block. stored in current free block
-#define GETPREVFREEADD(bp) *(char  *) ( (char *)bp+SIZE_T_SIZE)
-#define GETNEXTFREEADD(bp) *(char *) ((char *) bp+SIZE_T_SIZE+ALIGN(sizeof(char *)))
+#define GETPREVFREE(bp) *(char  *) ( (char *)bp+SIZE_T_SIZE)
+#define GETNEXTFREE(bp) *(char *) ((char *) bp+SIZE_T_SIZE+ALIGN(sizeof(char *)))
 #define GETFOOTER(bp)((bp + GETSIZEHEADER(bp)- SIZE_T_SIZE))
 #define MINSIZE (2*SIZE_T_SIZE +2* ALIGN(sizeof(void *)))
 static char * mm_heap;
@@ -53,13 +53,14 @@ void *mm_malloc(size_t payload)
 	if (size<MINSIZE) size  = MINSIZE;
 	void * block_pointer;
 	block_pointer =search_free_list(size); 
-	if (block_pointer != NULL){
+	if (block_pointer!= NULL) return block_pointer;	
+/*	if (block_pointer != NULL){
 		//assert(1==2);
 		size|= 0x1;
 		memcpy(block_pointer, &size, sizeof(size_t));
 		memcpy(block_pointer+ size-1-SIZE_T_SIZE, &size, sizeof(size_t)); 
 	 return block_pointer;
-	}
+	}*/
 	
 	block_pointer = mem_sbrk(size);
 	//printf("size %u\n", size);
@@ -197,13 +198,49 @@ void *mm_realloc(void *ptr, size_t payload)
 	}  
   	return ptr;
 }
+//searches the free list when malloc is called.
+//steps: 1) search a block with the given size
+
+//2) if found: 
+/*  check size of the free block.
+new headers and footers and allocate bit should be set to 1.
+// now some free space is remaining. if it is greater than min size:
+//set header and footer of the remaining block and 
+*/
+// else: remove the block from free list
+//
+//
+//
+//
 void * search_free_list(size_t size){
 	void * curr =GETNEXTFREE(mm_head);
 	while(curr!= NULL){
-		//error here
-		
 		if (GETSIZEHEADER(curr)>= size){
-			assert(5==6);
+			size_t freeblocksize = GETSIZEHEADER(curr);
+/*if (freeblocksize -size >= MINSIZE){
+	allocate a block with required size(set its header and footer and allocate bit)
+	remaining free block:size and allocatebit header and footer to zero
+	and put it in free list.
+
+}*/
+
+			if (freeblocksize - size >= MINSIZE){
+
+
+
+
+			}
+			else{
+/*else{
+	update size with freeblocksize;
+	allocate the whole block and return pointer;
+
+
+}*/
+
+
+
+			}
 			void * prev = GETPREVFREE(curr);
 			void * next = GETNEXTFREE(curr);
 			memcpy(prev + SIZE_T_SIZE+ALIGN(sizeof(void *)),next, sizeof(void *));//next
