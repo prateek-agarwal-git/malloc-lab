@@ -227,8 +227,8 @@ void * search_free_list(size_t size){
 				size_t remaining = size- 1 - freeblocksize;
 				assert(remaining%ALIGNMENT == 0);
 				memcpy(curr+size-1, &remaining, sizeof(size_t));
-				memcpy(curr+ freeblocksize - SIZE_T_SIZE, &size,sizeof(size_t));
-				
+				memcpy(curr+ freeblocksize - SIZE_T_SIZE, &remaining,sizeof(size_t));
+				return curr;
 					}
 			else{
 	/*else{
@@ -238,7 +238,7 @@ void * search_free_list(size_t size){
 			size = freeblocksize|0x1;
 			memcpy(curr, &size, sizeof(size_t));
 			memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
-			return curr
+			return curr;
 
 
 
