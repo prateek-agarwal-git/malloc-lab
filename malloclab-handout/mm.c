@@ -30,8 +30,12 @@ team_t team = {
 static char * mm_heap;
 static char *mm_head;
 void * search_free_list(size_t );
-void insertfreelist(void * bp);
-void delete_from_free(void * bp); 
+void insertfreelist(void *, void *);
+int mm_init(void);
+void * mm_malloc(size_t);
+void mm_free(size_t);
+void *mm_realloc(void *, size_t);
+void  delete_from_freelist(void * bp);
 int mm_init(void)
 {
 	//make a dummy head node for free list
@@ -179,31 +183,11 @@ void *mm_realloc(void *ptr, size_t payload)
 	}  
   	return ptr;
 }
-//searches the free list when malloc is called.
-//steps: 1) search a block with the given size
-
-//2) if found: 
-/*  check size of the free block.
-new headers and footers and allocate bit should be set to 1.
-// now some free space is remaining. if it is greater than min size:
-//set header and footer of the remaining block and 
-*/
-// else: remove the block from free list
-//
-//
-//
-//
 void * search_free_list(size_t size){
 	void * curr =GETNEXTFREE(mm_head);
 	while(curr!= NULL){
 		if (GETSIZEHEADER(curr)>= size){
 			size_t freeblocksize = GETSIZEHEADER(curr);
-/*if (freeblocksize -size >= MINSIZE){
-	allocate a block with required size(set its header and footer and allocate bit)
-	remaining free block:size and allocatebit header and footer to zero
-	and put it in free list.
-
-*/
 
 			if (freeblocksize - size >= MINSIZE){
 				void * prev = GETPREVFREE(curr);
@@ -220,10 +204,6 @@ void * search_free_list(size_t size){
 				return curr;
 				}
 			else{
-	/*else{
-		update size with freeblocksize;
-		allocate the whole block and return pointer;
-		}*/
 				size = freeblocksize|0x1;
 				memcpy(curr, &size, sizeof(size_t));
 				memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
@@ -268,55 +248,22 @@ void  delete_from_freelist(void * bp){
 
 
 
-/*void mm_free(void *bp){
-	
-	size_t physicalprevsize =*(size_t *) ( bp - SIZE_T_SIZE);
-	size_t physicalnextsize = *(size_t *)(bp +GETSIZEHEADER(bp));
-	size_t physicalprevbool = physicalprevsize & 0x1;
-	size_t physicalnextbool = physicalnextsize &  0x1;
-	if (bp==mm_heap){ physicalnextbool = 1;//do not consider for coalescing
-	if (physicalprevbool && physicalnextbool){
- 		size_t currsize = GETSIZEHEADER(bp);
-		memcpy(bp, &currsize, sizeof(size_t));
-		memcpy(bp +currsize - SIZE_T_SIZE, &currsize, sizeof(size_t));
-		insertfreelist(bp);
-		return;//both are allocated
-	}
-	else if (physicalprevbool && !physicalnextbool){//next is free
-		size_t newfreesize = GETSIZEHEADER(bp) +(physicalnextsize &~0x1);
-		assert(newfreesize %ALIGNMENT == 0);
-		delete_from_free((char *)bp+physicalnextsize);
-		memcpy(bp, &newfreesize, sizeof(size_t));
-		memcpy(bp + newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-		insertfreelist(bp);
-	}
-	else if (!physicalprevbool && physicalnextbool){//previous is free
-		size_t newfreesize = GETSIZEHEADER(bp) +(physicalprevsize &~0x1); 
-		assert(newfreesize %ALIGNMENT == 0);
-		delete_from_free((char *)bp-physicalprevsize);
-		memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
-		memcpy(bp+GETSIZEHEADER(bp) - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-		insertfreelist(bp-physicalprevsize);
-	}
-	else{
-		size_t newfreesize = GETSIZEHEADER(bp) +(physicalnextsize &~0x1)+(physicalprevsize &~0x1); 
-		assert(newfreesize%ALIGNMENT==0);
-		delete_from_free(bp+physicalnextsize);
-		delete_from_free(bp-physicalprevsize);
-		memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
-		memcpy(bp-physicalprevsize+newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-		insertfreelist(bp-physicalprevsize);
+	/*else{
+		update size with freeblocksize;
+		allocate the whole block and return pointer;
+		}*/
 
-	}
-	return;
-}*/
+//searches the free list when malloc is called.
+//steps: 1) search a block with the given size
 
-
-
-	/*	memcpy(bp+SIZE_T_SIZE+ALIGN(sizeof(void*)),&nexthead,sizeof(void *) );//next of current
-		memcpy(mm_head + SIZE_T_SIZE+ALIGN(sizeof(void *)),bp, sizeof(void *));//next of head
-		memcpy(bp+SIZE_T_SIZE,mm_head,sizeof(void *) );//prev of current*/
-
-
-
-
+//2) if found: 
+/*  check size of the free block.
+new headers and footers and allocate bit should be set to 1.
+// now some free space is remaining. if it is greater than min size:
+//set header and footer of the remaining block and 
+*/
+// else: remove the block from free list
+//
+//
+//
+//
