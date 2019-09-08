@@ -16,7 +16,7 @@ team_t team = {
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 #define GETHEADER(bp) (*bp) 
-#define GETSIZEHEADER(bp)((*(size_t *)bp) &= ~0x1)
+#define GETSIZEHEADER(bp) (*(size_t *)bp)
 #define GETPREVFREE(bp) *(char  *) ( (char *)bp+SIZE_T_SIZE)
 #define GETNEXTFREE(bp) *(char *) ((char *) bp+SIZE_T_SIZE+ALIGN(sizeof(char *)))
 #define GETFOOTER(bp)((bp + GETSIZEHEADER(bp)- SIZE_T_SIZE))
@@ -42,6 +42,8 @@ int mm_init(void)
 	memcpy(mm_head+MINSIZE-SIZE_T_SIZE,&minsize, sizeof(size_t));//footer
 	memset(mm_head + SIZE_T_SIZE, 0, sizeof(void *));//pre
 	memset(mm_head + SIZE_T_SIZE+ALIGN(sizeof(void *)),0, sizeof(void *));//next
+	//printf("init getsizeheader %u",GETSIZEHEADER(mm_head));
+
 	return 0;
 }
 
@@ -66,16 +68,17 @@ void mm_free(void *bp){
 	if (bp==mm_heap){
 		size_t physicalprevsize =*(size_t *) ( bp - SIZE_T_SIZE);
 		size_t physicalprevbool = physicalprevsize & 0x1;
+		//assert(physicalprevbool==0);
 		if (physicalprevbool){
- 			size_t currsize = GETSIZEHEADER(bp);
+ 			size_t currsize = GETSIZEHEADER(bp)-1;
 			memcpy(bp, &currsize, sizeof(size_t));
 			memcpy(bp +currsize - SIZE_T_SIZE, &currsize, sizeof(size_t));
 			insertfreelist(bp,mm_head);
 			return;//both are allocated
 		}
 		else{
-
-			size_t newfreesize = GETSIZEHEADER(bp) +(physicalprevsize &~0x1); 
+			//assert(GETSIZEHEADER(bp)%2!=0);
+			size_t newfreesize = GETSIZEHEADER(bp)-1 +(physicalprevsize &~0x1); 
 			assert(newfreesize %ALIGNMENT == 0);
 			delete_from_freelist((char *)bp-physicalprevsize);
 			memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
@@ -87,7 +90,7 @@ void mm_free(void *bp){
 	else{
 		
 		size_t physicalprevsize =*(size_t *) ( bp - SIZE_T_SIZE);
-		size_t physicalnextsize = *(size_t *)(bp +GETSIZEHEADER(bp));
+		size_t physicalnextsize = *(size_t *)(bp +GETSIZEHEADER(bp)-1);
 		size_t 	physicalprevbool = physicalprevsize & 0x1;
 		size_t physicalnextbool = physicalnextsize &  0x1;
 		if (physicalprevbool && physicalnextbool){
@@ -177,10 +180,13 @@ void *mm_realloc(void *ptr, size_t payload)
 }
 void * search_free_list(size_t size){
 	void * curr =GETNEXTFREE(mm_head);
+	int i = 0;
+	assert((size>=MINSIZE) &&(size%ALIGNMENT == 0));
 	while(curr!= NULL){
+		
 		if (GETSIZEHEADER(curr)>= size){
 			size_t freeblocksize = GETSIZEHEADER(curr);
-
+			assert(freeblocksize%ALIGNMENT == 0);
 			if (freeblocksize - size >= MINSIZE){
 				void * prev = GETPREVFREE(curr);
 				void * next = GETNEXTFREE(curr);
@@ -202,7 +208,7 @@ void * search_free_list(size_t size){
 
 			}
 		}
-		curr = GETNEXTFREE(curr);
+		curr = GETNEXTFREE(curr); i++;
 	}
 	return NULL;	
 }
@@ -228,8 +234,16 @@ void insertfreelist(void * bp, void *prev){
 void  delete_from_freelist(void * bp){
 	void * next =GETNEXTFREE(bp);
 	void * prev = GETPREVFREE(bp);
-	memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
-	memcpy((char *)next + SIZE_T_SIZE , &prev, sizeof (void *));
+	if (next!= NULL){
+		memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
+		memcpy((char *)next + SIZE_T_SIZE , &prev, sizeof (void *));
+	}
+	else{
+		memset((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), 0, sizeof (void *));
+	//	memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
+
+
+	}
 	return;
 } 
 
