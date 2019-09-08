@@ -17,11 +17,10 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 #define GETHEADER(bp) (*bp) 
 #define GETSIZEHEADER(bp) (*(size_t *)bp)
-#define GETPREVFREE(bp) *(size_t  *) (bp+SIZE_T_SIZE)
-#define GETNEXTFREE(bp) *(char *) ( bp+SIZE_T_SIZE+ALIGN(sizeof(char *)))
-//#define GETFOOTER(bp)((bp + GETSIZEHEADER(bp)- SIZE_T_SIZE))
+#define GETPREVFREE(bp) *(char  *) ( (char *)bp+SIZE_T_SIZE)
+#define GETNEXTFREE(bp) *(char *) ((char *) bp+SIZE_T_SIZE+ALIGN(sizeof(char *)))
+#define GETFOOTER(bp)((bp + GETSIZEHEADER(bp)- SIZE_T_SIZE))
 #define MINSIZE (2*SIZE_T_SIZE +2* ALIGN(sizeof(void *)))
-#define IS_ALIGNED(p)  ((((unsigned int)(p)) % ALIGNMENT) == 0)
 static char * mm_heap;
 static char *mm_head;
 void * search_free_list(size_t );
@@ -31,26 +30,14 @@ void * mm_malloc(size_t);
 void mm_free(void *);
 void *mm_realloc(void *, size_t);
 void  delete_from_freelist(void * bp);
-void printfreelist(){
-	void * curr = GETNEXTFREE(mm_head);
-	printf("free size%u", GETSIZEHEADER(curr));
-
-//	while (curr!= NULL){
-//		//assert(curr!= NULL);
-//		printf("free size%u", GETSIZEHEADER(curr));
-//		curr = GETNEXTFREE(curr);
-//	}
-	return;
-
-}
 int mm_init(void)
 {
 	//make a dummy head node for free list
 	mem_init();
 	size_t minsize = MINSIZE+1;
 	mm_head =mem_sbrk(MINSIZE);
-//	assert(!IS_ALIGNED(mm_head));
 	mm_heap = mm_head;
+	//assert(minsize%2==0);
 	memcpy(mm_head,&minsize,sizeof(size_t));//header
 	memcpy(mm_head+MINSIZE-SIZE_T_SIZE,&minsize, sizeof(size_t));//footer
 	memset(mm_head + SIZE_T_SIZE, 0, sizeof(void *));//pre
@@ -73,50 +60,28 @@ void *mm_malloc(size_t payload)
 		 return NULL;}
 	mm_heap = block_pointer;
 	size = size|0x1;
-	assert(IS_ALIGNED(block_pointer));
-//	assert
-	//assert(size%2==0);
-	//size is odd
 	memcpy(block_pointer, &size, sizeof(size_t));
-	size_t step = size&~0x1;
-	assert(IS_ALIGNED(block_pointer+step));
-	memcpy(block_pointer+step-SIZE_T_SIZE, &size, sizeof(size_t));
-	printf(" hi %u ", GETSIZEHEADER(block_pointer));
+	memcpy(block_pointer+size-SIZE_T_SIZE-1, &size, sizeof(size_t));
 	return block_pointer;
 }
 void mm_free(void *bp){
 	if (bp==mm_heap){
 		size_t physicalprevsize =*(size_t *) ( bp - SIZE_T_SIZE);
 		size_t physicalprevbool = physicalprevsize & 0x1;
-		//assert(physicalprevbool==0);
 		if (physicalprevbool){
- 			size_t  currsize = GETSIZEHEADER(bp);
-			currsize= currsize &~0x1;
-		//	printf("\n size from free = %u\n ",currsize);
-			//currsize = currsize -1;
-			//because it is an allocated  block so currsize is odd
-			//assert(currsize%2==0);//recentfailure
-			//assert(IS_ALIGNED(currsize));
-			//head of the block getting freed
+ 			size_t currsize = GETSIZEHEADER(bp);
 			memcpy(bp, &currsize, sizeof(size_t));
-			//assert(IS_ALIGNED(bp+currsize));
-			memcpy(bp +(currsize - SIZE_T_SIZE), &currsize, sizeof(size_t));
+			memcpy(bp +currsize - SIZE_T_SIZE, &currsize, sizeof(size_t));
 			insertfreelist(bp,mm_head);
-		//	printf("\n size from free = %u\n ",currsize);
-
-		//	printfreelist();
 			return;//both are allocated
 		}
 		else{
-			//assert(GETSIZEHEADER(bp)%2!=0);
-			size_t newfreesize = (GETSIZEHEADER(bp)&~0x1) +(physicalprevsize &~0x1); 
+
+			size_t newfreesize = GETSIZEHEADER(bp) +(physicalprevsize &~0x1); 
 			assert(newfreesize %ALIGNMENT == 0);
 			delete_from_freelist((char *)bp-physicalprevsize);
-			assert(IS_ALIGNED(bp-physicalprevsize));
 			memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
-			assert(IS_ALIGNED(bp +GETSIZEHEADER(bp)));
-			size_t temp =GETSIZEHEADER(bp)&~0x1; 
-			memcpy(bp+ temp- SIZE_T_SIZE, &newfreesize, sizeof(size_t));
+			memcpy(bp+GETSIZEHEADER(bp) - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
 			insertfreelist(bp-physicalprevsize,mm_head);
 			return;
 		}
@@ -124,7 +89,7 @@ void mm_free(void *bp){
 	else{
 		
 		size_t physicalprevsize =*(size_t *) ( bp - SIZE_T_SIZE);
-		size_t physicalnextsize = *(size_t *)(bp +(GETSIZEHEADER(bp)&~0x1));
+		size_t physicalnextsize = *(size_t *)(bp +GETSIZEHEADER(bp));
 		size_t 	physicalprevbool = physicalprevsize & 0x1;
 		size_t physicalnextbool = physicalnextsize &  0x1;
 		if (physicalprevbool && physicalnextbool){
@@ -174,11 +139,11 @@ void *mm_realloc(void *ptr, size_t payload)
 	if (size == currentsize) return ptr;
 	if (size < currentsize ){
 		size_t remaining = currentsize - size;
-		size = size|0x1;
-		size_t newsize = size&~0x1;
+		size = size+1;
+		size_t newsize = size -1;
 		memcpy(ptr,&size, sizeof(size_t));
 		memcpy(ptr+newsize- SIZE_T_SIZE, &size, sizeof(size_t));
-		size = size&~0x1;
+		size = size-1;;
 		if (remaining >= MINSIZE){
 			memcpy(ptr+newsize,&remaining, sizeof(size_t)  );
 			memcpy(ptr +currentsize -SIZE_T_SIZE ,&remaining, sizeof(size_t));
@@ -190,7 +155,7 @@ void *mm_realloc(void *ptr, size_t payload)
 	if ((physicalnextsize%2 == 0) &&((physicalnextsize+currentsize)>= size)){
 		size_t remaining = physicalnextsize+currentsize - size;
 		size_t blocksize = size;
-		size = size|0x1;
+		size = size+1;
 		memcpy(ptr,&size, sizeof(size_t ));
 		memcpy(ptr+blocksize- SIZE_T_SIZE, &size, sizeof(size_t));
 		if (remaining > MINSIZE){
@@ -215,31 +180,30 @@ void *mm_realloc(void *ptr, size_t payload)
 void * search_free_list(size_t size){
 	void * curr =GETNEXTFREE(mm_head);
 	int i = 0;
-	assert((size>=MINSIZE) &&(size%ALIGNMENT == 0));
 	while(curr!= NULL){
-		
+	//	printf("haha %d", i);
+		assert(GETSIZEHEADER(curr)%ALIGNMENT!=0);
+		//printf("is getsizeheader working %u", GETSIZEHEADER(curr));
 		if (GETSIZEHEADER(curr)>= size){
 			size_t freeblocksize = GETSIZEHEADER(curr);
-			assert(freeblocksize%ALIGNMENT == 0);
+
 			if (freeblocksize - size >= MINSIZE){
 				void * prev = GETPREVFREE(curr);
 				void * next = GETNEXTFREE(curr);
-				size = size|0x1;
-				size_t step = size &~0x1;								
+				size = size|0x1;								
 				memcpy(curr, &size, sizeof(size_t));
-				memcpy(curr+ step - SIZE_T_SIZE, &size,sizeof(size_t));
-				size_t remaining = step - freeblocksize;
+				memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
+				size_t remaining = size- 1 - freeblocksize;
 				assert(remaining%ALIGNMENT == 0);
-				memcpy(curr+step, &remaining, sizeof(size_t));
+				memcpy(curr+size-1, &remaining, sizeof(size_t));
 				memcpy(curr+ freeblocksize - SIZE_T_SIZE, &remaining,sizeof(size_t));
-				insertfreelist(curr+step,prev);				
+				insertfreelist(curr+size-1,prev);				
 				return curr;
 				}
 			else{
 				size = freeblocksize|0x1;
-				size_t step = freeblocksize &~0x1;
 				memcpy(curr, &size, sizeof(size_t));
-				memcpy(curr+ step - SIZE_T_SIZE, &size,sizeof(size_t));
+				memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
 				return curr;
 
 			}
@@ -248,21 +212,8 @@ void * search_free_list(size_t size){
 	}
 	return NULL;	
 }
-void * getnextfree(void * dest, void * src){
-	size_t sourcesize = GETSIZEHEADER(src);
-	sourcesize = sourcesize &~0x1;
-	
-
-
-
-
-}
 void insertfreelist(void * bp, void *prev){
-	void *nexttohead;
-	size_t headsize = GETSIZEHEADER(prev);
-	headsize = headsize &~0x1;
-	memcpy(&nexttohead,prev+SIZE_T_SIZE+ALIGN(sizeof(void *)),sizeof(void *));// store next of prev in a temp variable	
-	//assert(nexttohead != NULL);
+	void *nexttohead = GETNEXTFREE(prev);
 	if (nexttohead != NULL){
 		memcpy(bp + SIZE_T_SIZE, &prev, sizeof(void *) );
 		memcpy(bp + SIZE_T_SIZE+ALIGN(sizeof(void *)),&nexttohead, sizeof(void *) );
@@ -273,9 +224,6 @@ void insertfreelist(void * bp, void *prev){
 	}
 	else{
 		memcpy(bp+SIZE_T_SIZE,&prev,sizeof(void *) );
-	//	printf("pointer ");
-		
-		//printf("previous in bp %u\n",GETPREVFREE(bp));
 		memset(bp+SIZE_T_SIZE+ ALIGN(sizeof(void *)),0,sizeof(void *) );
 		memcpy(prev+SIZE_T_SIZE+ALIGN(sizeof(void *)),&bp, sizeof(void *));
 		return;
@@ -286,17 +234,8 @@ void insertfreelist(void * bp, void *prev){
 void  delete_from_freelist(void * bp){
 	void * next =GETNEXTFREE(bp);
 	void * prev = GETPREVFREE(bp);
-	if (next!= NULL){
-		memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
-		memcpy((char *)next + SIZE_T_SIZE , &prev, sizeof (void *));
-	}
-	else{
-		
-		memset((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), 0, sizeof (void *));
-	//	memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
-
-
-	}
+	memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
+	memcpy((char *)next + SIZE_T_SIZE , &prev, sizeof (void *));
 	return;
 } 
 

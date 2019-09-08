@@ -824,6 +824,13 @@ static void eval_mm_speed(void *ptr)
 	    app_error("Nonexistent request type in eval_mm_valid");
         }
 }
+
+/*
+ * eval_libc_valid - We run this function to make sure that the
+ *    libc malloc can run to completion on the set of traces.
+ *    We'll be conservative and terminate if any libc malloc call fails.
+ *
+ */
 static int eval_libc_valid(trace_t *trace, int tracenum)
 {
     int i, newsize;
@@ -858,14 +865,22 @@ static int eval_libc_valid(trace_t *trace, int tracenum)
 	    app_error("invalid operation type  in eval_libc_valid");
 	}
     }
+
     return 1;
 }
+
+/* 
+ * eval_libc_speed - This is the function that is used by fcyc() to
+ *    measure the running time of the libc malloc package on the set
+ *    of traces.
+ */
 static void eval_libc_speed(void *ptr)
 {
     int i;
     int index, size, newsize;
     char *p, *newp, *oldp, *block;
     trace_t *trace = ((speed_t *)ptr)->trace;
+
     for (i = 0;  i < trace->num_ops;  i++) {
         switch (trace->ops[i].type) {
         case ALLOC: /* malloc */
@@ -875,14 +890,17 @@ static void eval_libc_speed(void *ptr)
 		unix_error("malloc failed in eval_libc_speed");
 	    trace->blocks[index] = p;
 	    break;
+
 	case REALLOC: /* realloc */
 	    index = trace->ops[i].index;
 	    newsize = trace->ops[i].size;
 	    oldp = trace->blocks[index];
 	    if ((newp = realloc(oldp, newsize)) == NULL)
 		unix_error("realloc failed in eval_libc_speed\n");
+	    
 	    trace->blocks[index] = newp;
 	    break;
+	    
         case FREE: /* free */
 	    index = trace->ops[i].index;
 	    block = trace->blocks[index];
@@ -891,6 +909,15 @@ static void eval_libc_speed(void *ptr)
 	}
     }
 }
+
+/*************************************
+ * Some miscellaneous helper routines
+ ************************************/
+
+
+/*
+ * printresults - prints a performance summary for some malloc package
+ */
 static void printresults(int n, stats_t *stats) 
 {
     int i;
@@ -944,21 +971,37 @@ static void printresults(int n, stats_t *stats)
     }
 
 }
+
+/* 
+ * app_error - Report an arbitrary application error
+ */
 void app_error(char *msg) 
 {
     printf("%s\n", msg);
     exit(1);
 }
+
+/* 
+ * unix_error - Report a Unix-style error
+ */
 void unix_error(char *msg) 
 {
     printf("%s: %s\n", msg, strerror(errno));
     exit(1);
 }
+
+/*
+ * malloc_error - Report an error returned by the mm_malloc package
+ */
 void malloc_error(int tracenum, int opnum, char *msg)
 {
     errors++;
     printf("ERROR [trace %d, line %d]: %s\n", tracenum, LINENUM(opnum), msg);
 }
+
+/* 
+ * usage - Explain the command line arguments
+ */
 static void usage(void) 
 {
     fprintf(stderr, "Usage: mdriver [-hvVal] [-f <file>] [-t <dir>]\n");
