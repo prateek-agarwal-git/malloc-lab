@@ -21,7 +21,8 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 //ALERT : see all the alerts
 #define GETHEADER(bp) (*bp) 
-#define GETSIZEHEADER(bp) (((size_t)* (char *)bp) & ~0x1)
+//#define GETSIZEHEADER(bp) (((size_t)* (char *)bp) & ~0x1)
+#define GETSIZEHEADER((bp)(*(size_t *)bp) &= ~0x1)
 // address of  previous free block. stored in current free block
 #define GETPREVFREE(bp)*  (char  *) ( (char *)bp+SIZE_T_SIZE)
 //get next free block from current free block
@@ -180,6 +181,7 @@ void * search_free_block(size_t size){
 	//assert(3==4);
 	while(curr!= NULL){
 		//error here
+		
 		if (GETSIZEHEADER(curr)>= size){
 			assert(5==6);
 			void * prev = GETPREVFREE(curr);
