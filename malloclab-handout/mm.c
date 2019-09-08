@@ -54,21 +54,13 @@ void *mm_malloc(size_t payload)
 	void * block_pointer;
 	block_pointer =search_free_list(size); 
 	if (block_pointer!= NULL) return block_pointer;	
-/*	if (block_pointer != NULL){
-		//assert(1==2);
-	}*/
-	
 	block_pointer = mem_sbrk(size);
-	//printf("size %u\n", size);
 	if (block_pointer == (void *) -1){
 		assert(3==4);
-	 return NULL;}
+		 return NULL;}
 	mm_heap = block_pointer;
 	size = size|0x1;
-	//printf("size %u\n", size);
-
 	memcpy(block_pointer, &size, sizeof(size_t));
-	//block_pointer = block_pointer + size - SIZE_T_SIZE-1;
 	memcpy(block_pointer+size-SIZE_T_SIZE-1, &size, sizeof(size_t));
 	return block_pointer;
 }
@@ -82,7 +74,7 @@ void mm_free(void *bp){
 			memcpy(bp, &currsize, sizeof(size_t));
 			memcpy(bp +currsize - SIZE_T_SIZE, &currsize, sizeof(size_t));
 			printf("blockpointer= %lu\n, currsize = %lu\n, size_t_size = %lu\n, ",bp, currsize, SIZE_T_SIZE );
-			insertfreelist(bp);
+			insertfreelist(bp,mm_head);
 			return;//both are allocated
 		}
 		else{
@@ -92,13 +84,9 @@ void mm_free(void *bp){
 			delete_from_free((char *)bp-physicalprevsize);
 			memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
 			memcpy(bp+GETSIZEHEADER(bp) - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-			insertfreelist(bp-physicalprevsize);
-
+			insertfreelist(bp-physicalprevsize,mm_head);
 			return;
-
 		}
-
-
 	}
 	else{
 		
@@ -110,7 +98,7 @@ void mm_free(void *bp){
  			size_t currsize = GETSIZEHEADER(bp);
 			memcpy(bp, &currsize, sizeof(size_t));
 			memcpy(bp +currsize - SIZE_T_SIZE, &currsize, sizeof(size_t));
-			insertfreelist(bp);
+			insertfreelist(bp,mm_head);
 			return;//both are allocated
 		}
 		else if (physicalprevbool && !physicalnextbool){//next is free
@@ -119,7 +107,7 @@ void mm_free(void *bp){
 			delete_from_free((char *)bp+physicalnextsize);
 			memcpy(bp, &newfreesize, sizeof(size_t));
 			memcpy(bp + newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-			insertfreelist(bp);
+			insertfreelist(bp, mm_head);
 		}
 		else if (!physicalprevbool && physicalnextbool){//previous is free
 			size_t newfreesize = GETSIZEHEADER(bp) +(physicalprevsize &~0x1); 
@@ -127,7 +115,7 @@ void mm_free(void *bp){
 			delete_from_free((char *)bp-physicalprevsize);
 			memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
 			memcpy(bp+GETSIZEHEADER(bp) - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-			insertfreelist(bp-physicalprevsize);
+			insertfreelist(bp-physicalprevsize, mm_head);
 		}
 		else{
 			size_t newfreesize = GETSIZEHEADER(bp) +(physicalnextsize &~0x1)+(physicalprevsize &~0x1); 
@@ -136,12 +124,10 @@ void mm_free(void *bp){
 			delete_from_free(bp-physicalprevsize);
 			memcpy(bp -physicalprevsize, &newfreesize, sizeof(size_t));
 			memcpy(bp-physicalprevsize+newfreesize - SIZE_T_SIZE, &newfreesize, sizeof(size_t));
-			insertfreelist(bp-physicalprevsize);
-
+			insertfreelist(bp-physicalprevsize, mm_head);
 		}	
 	}
 	return;
-
 }
 void *mm_realloc(void *ptr, size_t payload)
 {
@@ -161,10 +147,9 @@ void *mm_realloc(void *ptr, size_t payload)
 		memcpy(ptr+newsize- SIZE_T_SIZE, &size, sizeof(size_t));
 		size = size-1;;
 		if (remaining >= MINSIZE){
-			//setting header and footer of the freed block
 			memcpy(ptr+newsize,&remaining, sizeof(size_t)  );
 			memcpy(ptr +currentsize -SIZE_T_SIZE ,&remaining, sizeof(size_t));
-			insertfreelist((ptr+newsize));
+			insertfreelist((ptr+newsize), mm_head);
 		}
 		return ptr;
 	}
@@ -221,6 +206,8 @@ void * search_free_list(size_t size){
 */
 
 			if (freeblocksize - size >= MINSIZE){
+				void * prev = GETPREVFREE(curr);
+				void * next = GETNEXTFREE(curr);
 				size = size|0x1;								
 				memcpy(curr, &size, sizeof(size_t));
 				memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
@@ -228,24 +215,21 @@ void * search_free_list(size_t size){
 				assert(remaining%ALIGNMENT == 0);
 				memcpy(curr+size-1, &remaining, sizeof(size_t));
 				memcpy(curr+ freeblocksize - SIZE_T_SIZE, &remaining,sizeof(size_t));
+				//insert into free list
+				insertfreelist(curr+size-1,prev);				
 				return curr;
-					}
+				}
 			else{
 	/*else{
 		update size with freeblocksize;
 		allocate the whole block and return pointer;
 		}*/
-			size = freeblocksize|0x1;
-			memcpy(curr, &size, sizeof(size_t));
-			memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
-			return curr;
-
-
-
+				size = freeblocksize|0x1;
+				memcpy(curr, &size, sizeof(size_t));
+				memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
+				return curr;
 
 			}
-			void * prev = GETPREVFREE(curr);
-			void * next = GETNEXTFREE(curr);
 			memcpy(prev + SIZE_T_SIZE+ALIGN(sizeof(void *)),next, sizeof(void *));//next
 			if (next != NULL) memcpy(next + SIZE_T_SIZE, prev, sizeof(void *));//prev
 			return curr;
@@ -255,24 +239,21 @@ void * search_free_list(size_t size){
 	
 	return NULL;	
 }
-void insertfreelist(void * bp){
-	void *nexttohead = GETNEXTFREE(mm_head);
+void insertfreelist(void * bp, void *prev){
+	void *nexttohead = GETNEXTFREE(prev);
 	if (nexttohead != NULL){
-
-		memcpy(bp + SIZE_T_SIZE, &mm_head, sizeof(void *) );
+		memcpy(bp + SIZE_T_SIZE, &prev, sizeof(void *) );
 		memcpy(bp + SIZE_T_SIZE+ALIGN(sizeof(void *)),&nexttohead, sizeof(void *) );
-		memcpy(mm_head+SIZE_T_SIZE + ALIGN(sizeof(void *)),&bp, sizeof(void *));
+		memcpy(prev+SIZE_T_SIZE + ALIGN(sizeof(void *)),&bp, sizeof(void *));
 		void * previousnexttohead = GETNEXTFREE(bp);
 		memcpy(previousnexttohead + SIZE_T_SIZE, &bp, sizeof(void *));
 		return;
 	}
 	else{
-		memcpy(bp+SIZE_T_SIZE,&mm_head,sizeof(void *) );
+		memcpy(bp+SIZE_T_SIZE,&prev,sizeof(void *) );
 		memset(bp+SIZE_T_SIZE+ ALIGN(sizeof(void *)),0,sizeof(void *) );
-		memcpy(mm_head+SIZE_T_SIZE+ALIGN(sizeof(void *)),&bp, sizeof(void *));
+		memcpy(prev+SIZE_T_SIZE+ALIGN(sizeof(void *)),&bp, sizeof(void *));
 		return;
-
-
 	}
 }
 
@@ -283,7 +264,6 @@ void  delete_from_freelist(void * bp){
 	memcpy((char *)prev + SIZE_T_SIZE + ALIGN(sizeof(void *)), &next, sizeof (void *));
 	memcpy((char *)next + SIZE_T_SIZE , &prev, sizeof (void *));
 	return;
-
 } 
 
 
