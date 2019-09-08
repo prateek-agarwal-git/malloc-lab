@@ -56,10 +56,6 @@ void *mm_malloc(size_t payload)
 	if (block_pointer!= NULL) return block_pointer;	
 /*	if (block_pointer != NULL){
 		//assert(1==2);
-		size|= 0x1;
-		memcpy(block_pointer, &size, sizeof(size_t));
-		memcpy(block_pointer+ size-1-SIZE_T_SIZE, &size, sizeof(size_t)); 
-	 return block_pointer;
 	}*/
 	
 	block_pointer = mem_sbrk(size);
@@ -222,21 +218,28 @@ void * search_free_list(size_t size){
 	remaining free block:size and allocatebit header and footer to zero
 	and put it in free list.
 
-}*/
+*/
 
 			if (freeblocksize - size >= MINSIZE){
-
-
-
-
-			}
+				size = size|0x1;								
+				memcpy(curr, &size, sizeof(size_t));
+				memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
+				size_t remaining = size- 1 - freeblocksize;
+				assert(remaining%ALIGNMENT == 0);
+				memcpy(curr+size-1, &remaining, sizeof(size_t));
+				memcpy(curr+ freeblocksize - SIZE_T_SIZE, &size,sizeof(size_t));
+				
+					}
 			else{
-/*else{
-	update size with freeblocksize;
-	allocate the whole block and return pointer;
+	/*else{
+		update size with freeblocksize;
+		allocate the whole block and return pointer;
+		}*/
+			size = freeblocksize|0x1;
+			memcpy(curr, &size, sizeof(size_t));
+			memcpy(curr+ size -1 - SIZE_T_SIZE, &size,sizeof(size_t));
+			return curr
 
-
-}*/
 
 
 
