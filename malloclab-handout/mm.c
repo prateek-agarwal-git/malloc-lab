@@ -62,8 +62,8 @@ int mm_init(void)
    COPYNEXT(tempnext, mm_head);
     void * tempprev= -1;
     COPYPREVIOUS(tempprev, mm_head);
-    printf("calling from init \n");
-    printblockdetails(mm_head);
+   // printf("calling from init \n");
+   // printblockdetails(mm_head);
    // printf("previous to dummy should be null = %u\n",tempprev);
    //printf("next to dummy should be null = %u\n",tempnext);
     //printf("this should be head footer from mm_init %u\n", mm_head+MINSIZE-SIZE_T_SIZE);
@@ -80,15 +80,16 @@ void *mm_malloc(size_t payload)
     long int a = (long int) size- MINSIZE;
 	if (a<0) size  = MINSIZE;
     //search free list here.
-    bp = search_free_block(size);
     void * bp;
-	bp = mem_sbrk(size);
+    bp = search_free_block(size);
+     if (bp!= NULL) return bp;
+    bp = mem_sbrk(size);
     if (bp == (void *)-1)	return NULL;
     SETALLOCATEBIT(size);
     PUTSIZEINHEADER(bp,size);
     PUTSIZEINFOOTER(bp,size);
-    printf("calling from %d block pointer\n", index1++);
-    printblockdetails(bp);
+    //printf("calling from %d block pointer\n", index1++);
+    //printblockdetails(bp);
     //printf("Getting size from header %u\n", *(size_t *)bp);
     //printf("Getting size from footer %u\n",  *(size_t *)((char* )bp+size-SIZE_T_SIZE));
     mm_heap = bp;
@@ -104,7 +105,7 @@ void mm_free(void *ptr)
 {
         void * bp = ((char *)ptr - SIZE_T_SIZE );
         size_t physicalprevsize =*(size_t *) ( (char *)bp -SIZE_T_SIZE);
-        printf("this should be 33 = %u\n", physicalprevsize);
+        //printf("this should be 33 = %u\n", physicalprevsize);
         size_t bpsize = GETSIZEFROMHEADER(bp);
         bpsize = bpsize&~0x1;
         if (bp == mm_heap){
@@ -122,16 +123,16 @@ void mm_free(void *ptr)
                 size_t newsize = bpsize + physicalprevsize;
                 assert(newsize %ALIGNMENT == 0);
                 void * prevblock = (char *) bp - physicalprevsize;
-                //delete_from_free_list(prevblock);
+                delete_from_free_list(prevblock);
                 //exit(0);
                 PUTSIZEINHEADER(prevblock,newsize);
                 PUTSIZEINFOOTER(prevblock, newsize);
-                //insertfreelist(prevblock,mm_head);
+                insertfreelist(prevblock,mm_head);
                 return;}
         }
         else{//it is not the last block
             size_t physicalprevsize =*(size_t *) ( (char *)bp -SIZE_T_SIZE);
-            printf("Physical previous size is %u\n", physicalprevsize);
+            //printf("Physical previous size is %u\n", physicalprevsize);
             //exit(0);
 		    size_t prevoccupied = physicalprevsize & 0x1;
              void * nextblock = (char *)bp + bpsize;
@@ -139,40 +140,44 @@ void mm_free(void *ptr)
             size_t physicalnextsize = GETSIZEFROMHEADER(nextblock);
             size_t nextoccupied = physicalnextsize& 0x1;
             if (prevoccupied&&nextoccupied){//bothprevand next are occupied free this block insert it and return
-                bpsize &= ~0x1;
+                //bpsize &= ~0x1;
+                assert(bpsize%ALIGNMENT==0);
                 PUTSIZEINHEADER(bp,bpsize); 
                 PUTSIZEINFOOTER(bp,bpsize);
-                //insertfreelist(bp,mm_head);
+                insertfreelist(bp,mm_head);
                 return;}
             
             else if (prevoccupied && !nextoccupied){//next is free
                 size_t newsize = bpsize + physicalnextsize;
-                //delete_from_free_list(nextblock);
+                assert(newsize%ALIGNMENT==0);
+                delete_from_free_list(nextblock);
                 PUTSIZEINHEADER(bp,newsize);
                 PUTSIZEINFOOTER(bp,newsize);
-               // insertfreelist(bp,mm_head);
+                insertfreelist(bp,mm_head);
                 }  
             else if (!prevoccupied&&nextoccupied){//previous is free
+                assert(physicalprevsize%ALIGNMENT==0);
                 void * prevblock = (char *) bp - physicalprevsize;
                 size_t newsize =physicalprevsize+ bpsize;
-                //delete_from_free_list(prevblock);
+                delete_from_free_list(prevblock);
                 PUTSIZEINHEADER(prevblock,newsize);
                 PUTSIZEINFOOTER(prevblock,newsize);
-                //insertfreelist(prevblock, mm_head);
+                insertfreelist(prevblock, mm_head);
             }
             else{//both are free
+                assert(physicalprevsize%ALIGNMENT==0);
                 void * prevblock = (char *) bp - physicalprevsize;
                 size_t newsize = physicalnextsize+ physicalprevsize+bpsize;
-                //delete_from_free_list(prevblock);
-                //delete_from_free_list(nextblock);
+                assert(newsize%ALIGNMENT==0);
+                delete_from_free_list(prevblock);
+                delete_from_free_list(nextblock);
                 PUTSIZEINHEADER(prevblock,newsize);
                 PUTSIZEINFOOTER(prevblock, newsize);
-                //insertfreelist(prevblock,mm_head);
+                insertfreelist(prevblock,mm_head);
                 return;
-            }    
-        
+            }          
         }
-              return;
+        return;
         }
 void insertfreelist(void * bp, void *head){
     void *nexttohead;
@@ -222,22 +227,39 @@ void * search_free_block(size_t size){
             if (c >= 0){
                 void * prev;
 				void * next;
-                SE
-
-
-
-
+                COPYPREVIOUS(prev, curr);
+                COPYNEXT(next,curr);
+                SETNEXT(prev,next);
+                SETPREVIOUS(next,prev);
+                //curr has free block. sset the size set the allocate bi in header and footer
+                SETALLOCATEBIT(size);
+                PUTSIZEINHEADER(curr,size);
+                PUTSIZEINFOOTER(curr,size);
+                assert(remaining %ALIGNMENT== 0);
+                void * splittedfreeblock;
+                curr = (char *) curr +size;
+                //now curr is pointing to the newly made free block
+                PUTSIZEINHEADER(curr,remaining);
+                PUTSIZEINFOOTER(curr, remaining);
+                insertfreelist(curr);
+               //let us see we can place it in situ    
+                return curr;        
             }
-
-
+            else{
+                size = freeblocksize;
+                SETALLOCATEBIT(size);
+                PUTSIZEINHEADER(curr,size);
+                PUTSIZEINFOOTER(curr,size);
+                return curr;
+            }
         }
 
-
+        void * temp;
+		COPYNEXT(temp, curr);
+		curr = temp; 
 
     }
-
-
-
+return NULL;
 
 }
 /* search _ free_block
@@ -250,22 +272,6 @@ void * curr ;
 
 		if (memcmp(curr, &size,sizeof(size_t))>=0){
 		
-			if (memcmp(&temp2, &minsize, sizeof(size_t))>=0){
-				void * prev;
-				void * next;
-				setnextfree(&next,curr);
-				setprevfree(&prev,free);
-				size = size|0x1;
-				size_t step = size &~0x1;								
-				memcpy(curr, &size, sizeof(size_t));
-				memcpy(curr+ step - SIZE_T_SIZE, &size,sizeof(size_t));
-				size_t remaining =  freeblocksize - step;
-				assert(remaining%ALIGNMENT == 0);
-				memcpy(curr+step, &remaining, sizeof(size_t));
-				memcpy(curr+ freeblocksize - SIZE_T_SIZE, &remaining,sizeof(size_t));
-				insertfreelist(curr+step,prev);				
-				return curr;
-				}
 			else{
 				size = freeblocksize|0x1;
 				size_t step = freeblocksize &~0x1;
@@ -292,10 +298,7 @@ void * curr ;
 				void urr;
 			}
 		}
-		void * temp;
-		setnextfree(&temp,curr);
-		curr = temp; 
-		i++;
+		
 	}
 	return NULL;	
 }
