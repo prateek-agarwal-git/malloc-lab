@@ -671,7 +671,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
 	    /* Remove region from list and call student's free function */
 	    p = trace->blocks[index];
 	   //printf("block_pointer to be  freed in mdriver %u\n",p );
-		//printf("size of the block to be freed in mdriver = %zu\n",*(size_t *)((char *)p- SIZE_T_SIZE));
+		printf("size of the block to be freed in mdriver = %zu\n",*(size_t *)((char *)p- SIZE_T_SIZE));
 	    remove_range(ranges, p);
 	    mm_free(p);
 	    break;
