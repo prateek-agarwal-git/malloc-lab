@@ -50,7 +50,7 @@ int mm_init(void)
 	mem_init();
 	size_t minsize = MINSIZE+1;
 	mm_head =mem_sbrk(MINSIZE);
-	//mm_heap = mm_head+MINSIZE-1;
+	mm_heap = mm_head;
 	memcpy(mm_head,&minsize,sizeof(size_t));//header
 	memcpy(mm_head+MINSIZE-SIZE_T_SIZE,&minsize, sizeof(size_t));//footer
 	memset(mm_head + SIZE_T_SIZE, 0, sizeof(void *));//pre
@@ -59,18 +59,18 @@ int mm_init(void)
 }
 
 void *mm_malloc(size_t payload)
-{	//printfreelist();
+{	size_t minsize = MINSIZE;
 	size_t size = ALIGN(payload)+2*SIZE_T_SIZE;
-	if (size<MINSIZE) size  = MINSIZE;
+	long int a = (long int) size- minsize;// minsize<size
+	if (a<0) {
+		size  = MINSIZE;}
 	void * block_pointer;
 	block_pointer =search_free_list(size);
- 	//assert(block_pointer != NULL);
-	if (block_pointer!= NULL) return block_pointer;	
+ 	if (block_pointer!= NULL) return block_pointer;	
 	block_pointer = mem_sbrk(size);
 	if (block_pointer == (void *) -1){
 		assert(3==4);
 		 return NULL;}
-	assert(mm_head!=block_pointer); 
 	mm_heap = block_pointer;
 	size = size|0x1;
 	memcpy(block_pointer, &size, sizeof(size_t));
@@ -151,10 +151,12 @@ void *mm_realloc(void *ptr, size_t payload)
 		mm_free(ptr);
 		return NULL;}
 	size_t size = ALIGN(payload+2*SIZE_T_SIZE);
-	if (size<MINSIZE) size  = MINSIZE;
+	size_t minsize = MINSIZE;
+	if (memcmp(size,minsize, sizeof(size_t))<0) size  = MINSIZE;
 	size_t currentsize = GETSIZEHEADER(ptr); 
-	if (size == currentsize) return ptr;
-	if (size < currentsize ){
+
+	if (memcmp(&size,&currentsize, sizeof(size_t))==0) return ptr;
+	if (memcmp(&size,&currentsize, sizeof(size_t) )<0){
 		size_t remaining = currentsize - size;
 		size = size|0x1;
 		size_t newsize = size&~0x1;
@@ -203,11 +205,14 @@ void * search_free_list(size_t size){
 		if (memcmp(curr, &size,sizeof(size_t))>=0){
 			printf("hi what is up\n");
 			size_t freeblocksize = GETSIZEHEADER(curr);
-			assert(1==2);
+			//assert(1==2);
 			//if (freeblocksize < size){
 			//	return NULL;
 			//}
-			if (freeblocksize - size >= MINSIZE){
+			size_t minsize = MINSIZE;
+			size_t temp2 = freeblocksize - size; 
+			
+			if (memcmp(&temp2, &minsize, sizeof(size_t))>=0){
 				void * prev;
 				void * next;
 				setnextfree(&next,curr);
