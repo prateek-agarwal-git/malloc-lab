@@ -34,13 +34,15 @@ int mm_init(void)
     mm_head =mem_sbrk(MINSIZE);
     size_t minsize = MINSIZE|0x1;
    *(size_t *)(mm_head) = minsize;
-   *(size_t *)((char* )mm_head+minsize-SIZE_T_SIZE) = minsize;
+   *(size_t *)((char* )mm_head+MINSIZE-SIZE_T_SIZE) = minsize;
    *(char *)((char *)mm_head +SIZE_T_SIZE) = NULL;
     *(char *)((char *)mm_head +SIZE_T_SIZE+ALIGN(sizeof(void *))) = NULL;
+    printf("this should be head footer from mm_init %u\n", mm_head+MINSIZE-SIZE_T_SIZE);
+    mm_heap = mm_head;
    // printf("previous should be null %u\n", *(char *)((char *)mm_head +SIZE_T_SIZE));
    // printf("next should be null %u\n", *(char *)((char *)mm_head +SIZE_T_SIZE+ALIGN(sizeof(void *))));
   // printf("Getting size from header %u\n", *(size_t *)mm_head);
-   // printf("Getting size from footer %u\n",  *(size_t *)((char* )mm_head+minsize-SIZE_T_SIZE));
+    printf("Getting size from footer %u\n",  *(size_t *)((char* )mm_head+minsize-SIZE_T_SIZE));
 	return 0;
 }
 void *mm_malloc(size_t payload)
@@ -54,8 +56,13 @@ void *mm_malloc(size_t payload)
     SETALLOCATEBIT(size);
     PUTSIZEINHEADER(bp,size);
     PUTSIZEINFOOTER(bp,size);
+    
     //printf("Getting size from header %u\n", *(size_t *)bp);
     //printf("Getting size from footer %u\n",  *(size_t *)((char* )bp+size-SIZE_T_SIZE));
+    mm_heap = bp;
+    //printf("block from malloc %u\n", bp);
+
+
     return (char *)bp+SIZE_T_SIZE;
 
     
@@ -66,6 +73,25 @@ void *mm_malloc(size_t payload)
  */
 void mm_free(void *ptr)
 {
+        //printf("size from free %u\n",*(size_t *) ((char *)ptr - SIZE_T_SIZE ));
+        void * bp = ((char *)ptr - SIZE_T_SIZE );
+        printf("block from free %u\n", ((char *)ptr - SIZE_T_SIZE ));
+        printf("this is head %u\n", mm_head);
+        printf("this should be head footer from free %u\n", ((char *)bp - SIZE_T_SIZE));
+        if (bp == mm_heap){
+            size_t physicalprevsize =*(size_t *) ( (char *)bp -SIZE_T_SIZE);
+		    size_t physicalprevbool = physicalprevsize & 0x1;
+            printf("this should be 33 = %u \n", physicalprevsize);
+            exit(0);
+
+
+
+
+
+        }
+
+
+
 }
 
 /*
