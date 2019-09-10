@@ -50,7 +50,7 @@ int numfreelist(void){
     }
     return i;
 }
-void printblockdetails(void * bp){
+/*void printblockdetails(void * bp){
     printf("SIZE FROM HEADER %u\n",GETSIZEFROMHEADER(bp));
     printf("SIZE FROM FOOTER %u\n",*(size_t *)((char *)bp + (GETSIZEFROMHEADER(bp) &~0x1)- SIZE_T_SIZE));
     printf("BLOCK ADDRESS %u\n",bp);
@@ -58,8 +58,8 @@ void printblockdetails(void * bp){
     printf("NEXT POINTER %u\n",*(size_t *)(bp + SIZE_T_SIZE + ALIGN(sizeof(void *))));
     //assert(    );
     //assert((*(size_t *)(bp + SIZE_T_SIZE + ALIGN(sizeof(void *))))%ALIGNMENT==0);
-    return;}
-void printfreeblocks(){
+    return;}*/
+    /*void printfreeblocks(){
     void * start = mm_head;
     void * curr;
     COPYNEXT(curr,start);
@@ -71,72 +71,47 @@ void printfreeblocks(){
     }
     return;
 
-} 
-static int index1malloc;
-static int index2free;
-static char * dummy;
+} */
 int mm_init(void)
-
-{    colaescingkitnibaar = 0;
-    index1malloc= 0;
-    index2free= 0;
-    mm_heap = 0;
+{   
+     mm_heap = 0;
     mm_heap = 0;
     mm_head =mem_sbrk(MINSIZE);
-    dummy = mm_head;
     size_t minsize = MINSIZE|0x1;
     PUTSIZEINHEADER(mm_head,minsize);
     PUTSIZEINFOOTER(mm_head,minsize);
-   //
-      char * X = 0;
+    char * X = 0;
    SETNEXT(mm_head, X);
    SETPREVIOUS(mm_head,X);  
-   printblockdetails(mm_head);
-
-   // exit(0);
-    void * tempnext= -1;
-   COPYNEXT(tempnext, mm_head);
-    void * tempprev= -1;
-    COPYPREVIOUS(tempprev, mm_head);
     mm_heap = mm_head;
 	return 0;
 }
 void *mm_malloc(size_t payload)
-{   ///assert(size%2 != 0);
-    index1malloc ++;
+{ 
+  
     size_t size = ALIGN(payload)+2*SIZE_T_SIZE;
-    printf("This should be  8208 = %d", size);
-    long int a = (long int) size- MINSIZE;
+     long int a = (long int) size- MINSIZE;
 	if (a<0) size  = MINSIZE;
     void * bp;
-    bp = search_free_block(size);
-    
+    bp = search_free_block(size);    
      if (bp!= NULL){
-         printf("\n\nThis is  a 2 \n\n");
-        printblockdetails(bp);
-
      return (char *)bp+SIZE_T_SIZE;}
     bp = mem_sbrk(size);
     if (bp == (void *)-1)	return NULL;
     SETALLOCATEBIT(size);
-    assert(size%2 != 0);
+    //assert(size%2 != 0);
     PUTSIZEINHEADER(bp,size);
     PUTSIZEINFOOTER(bp,size);
     mm_heap = bp;
-    //printf("block number %d  from malloc \n",index1malloc++);
-    //\printblockdetails(bp);
     return (char *)bp+SIZE_T_SIZE;
 }
 
 void mm_free(void *ptr)
 {        void * bp = ((char *)ptr - SIZE_T_SIZE );
-        printf("\nnumberof items in free list = %d\n", numfreelist());
         size_t physicalprevsize =*(size_t *) ( (char *)bp -SIZE_T_SIZE);
-        //printf("this should be 33 = %u\n", physicalprevsize);
         size_t bpsize = GETSIZEFROMHEADER(bp);
-        //assert(bpsize%ALIGNMENT!= 0);
         bpsize = bpsize&~0x1;
-        //assert(bpsize%ALIGNMENT== 0);
+        
         void * temp = -1;
         if (bp == mm_heap){
             size_t physicalprevsize =*(size_t *) ( (char *)bp -SIZE_T_SIZE);
@@ -144,67 +119,37 @@ void mm_free(void *ptr)
             if (prevoccupied){
                 PUTSIZEINHEADER(bp,bpsize); 
                 PUTSIZEINFOOTER(bp,bpsize);
-                assert(bpsize%ALIGNMENT == 0);
                 insertfreelist(bp,mm_head);
                 return;
             }
             else{
                 size_t bpsize = *(size_t *) (bp); 
                 bpsize = bpsize&~0x1;
-                printf("this should be (4112) = %u\n", bpsize);
                 size_t newsize = bpsize + physicalprevsize;
-                assert(newsize %ALIGNMENT == 0);
-                printf("this should be (8224) = %u\n", newsize);
                 void * prevblock = (char *) bp - physicalprevsize;
-                //assert(newsize%ALIGNMENT == 0);
-                //could be here
-                //assert(prevblock!= mm_head);
                 COPYPREVIOUS(temp,prevblock);
-                //printf("\n  (dummy) == (temp) %u = %u\n",dummy,temp);
-                assert (temp!= NULL);
-               // temp = -1;
-
                 delete_from_free_list(prevblock);
-                //size_t prevoccupied1 = 
-                //exit(0);
                 PUTSIZEINHEADER(prevblock,newsize);
                 PUTSIZEINFOOTER(prevblock, newsize);
-                //printf("printing first colaescing, expected value: 8224 should be the size in header and footer\n");
-                //printf("Next should be Null, previous should point to dummy");
-                //printblockdetails(prevblock);
                 insertfreelist(prevblock,mm_head);
                 mm_heap = prevblock;
-                //printf("this should be 1 %d", numfreelist());
                 return;}
         }
         else{//it is not the last block
             size_t physicalprevsize =*(size_t *) ( (char *)bp -SIZE_T_SIZE);
-            //printf("Physical previous size is %u\n", physicalprevsize);
-            //exit(0);
-            assert(bpsize%ALIGNMENT == 0);
 		    size_t prevoccupied = physicalprevsize & 0x1;
              void * nextblock = (char *)bp + bpsize;
-           // void * prevblock = (char *) bp - physicalprevsize;
             size_t physicalnextsize = GETSIZEFROMHEADER(nextblock);
             size_t nextoccupied = physicalnextsize& 0x1;
-            if (prevoccupied&&nextoccupied){//bothprevand next are occupied free this block insert it and return
-               
-                 
+            if (prevoccupied&&nextoccupied){
                 PUTSIZEINHEADER(bp,bpsize); 
                 PUTSIZEINFOOTER(bp,bpsize);
-               // COPYPREVIOUS(temp,prevblock);
-
-                insertfreelist(bp,mm_head);
-                
+                insertfreelist(bp,mm_head);                
                 return;}
             
-            else if (prevoccupied && !nextoccupied){//next is free
-                
-                //colaescingkitnibaar++;
+            else if (prevoccupied && !nextoccupied){
                 size_t newsize = bpsize + physicalnextsize;
-                assert(newsize%ALIGNMENT==0);
                 COPYPREVIOUS(temp,nextblock);
-                printblockdetails(nextblock);
                 delete_from_free_list(nextblock);
                 PUTSIZEINHEADER(bp,newsize);
                 PUTSIZEINFOOTER(bp,newsize);
@@ -214,37 +159,27 @@ void mm_free(void *ptr)
                 }
                 return;
                 }  
-            else if (!prevoccupied&&nextoccupied){//previous is free
-            colaescingkitnibaar++;
-                assert(physicalprevsize%ALIGNMENT==0);
+            else if (!prevoccupied&&nextoccupied){
                 void * prevblock = (char *) bp - physicalprevsize;
                 size_t newsize =physicalprevsize+ bpsize;
                 COPYPREVIOUS(temp,prevblock);
-                assert (temp!= NULL);
                 delete_from_free_list(prevblock);
                 PUTSIZEINHEADER(prevblock,newsize);
                 PUTSIZEINFOOTER(prevblock,newsize);
                 insertfreelist(prevblock, mm_head);
+                return;
                 
             }
-            else{//both are free
-            //colaescingkitnibaar++;
-                assert(physicalprevsize%ALIGNMENT==0);
+            else{
                 void * prevblock = (char *) bp - physicalprevsize;
                 size_t newsize = physicalnextsize+ physicalprevsize+bpsize;
-                assert(newsize%ALIGNMENT==0);
-
-                //printf("%d\n",trace->ops[op_index].index );
                 COPYPREVIOUS(temp,prevblock);
-               // assert (temp!= NULL);
                 delete_from_free_list(prevblock);
                 COPYPREVIOUS(temp,nextblock);
-                //assert (temp!= NULL);
                 delete_from_free_list(nextblock);
                 PUTSIZEINHEADER(prevblock,newsize);
                 PUTSIZEINFOOTER(prevblock, newsize);
                 insertfreelist(prevblock,mm_head);
-                assert(GETSIZEFROMHEADER(prevblock)%2 == 0);
                 if (nextblock == mm_heap){
                     mm_heap = prevblock;
                 }
@@ -257,21 +192,13 @@ void insertfreelist(void * bp, void *head){
     void *nexttohead;
     nexttohead = *(size_t *) *((char *)head +SIZE_T_SIZE + ALIGN(sizeof(void *))) ;
     COPYNEXT(nexttohead,head);
-    
-     if(nexttohead==NULL){// it is the first node of free list 
-        
-
+    if(nexttohead==NULL){// it is the first node of free list 
         SETNEXT(head,bp);
         SETPREVIOUS(bp,head);
         SETNEXT(bp, NULL);
-        //printf("\nhead is (bp prev) %u\n", head);
-        //printblockdetails(bp);
            
     }
     else{
-        //assert(IS_ALIGNED(bp));
-        //assert(IS_ALIGNED(head));
-        //assert(IS_ALIGNED(nexttohead));
         SETPREVIOUS(bp,head);
         SETNEXT(bp, nexttohead);
         SETNEXT(head,bp);
@@ -284,16 +211,11 @@ void delete_from_free_list(void *bp){
     void * prev;
     COPYNEXT(next,bp);
     COPYPREVIOUS(prev,bp);
-    //assert (prev!= NULL);
     if (next != NULL){
         SETNEXT(prev,next);
         SETPREVIOUS(next,prev);
     }
-    else{
-        //*(char *)((char *)prev +SIZE_T_SIZE+ALIGN(sizeof(void *))) = NULL;
-        SETNEXT(prev, NULL);
-        
-    }
+    else        SETNEXT(prev, NULL);
     return ;
 }
 void * search_free_block(size_t size){
@@ -301,42 +223,28 @@ void * search_free_block(size_t size){
     COPYNEXT(curr, mm_head);
     void * temp3 = 0;
     while (curr!= NULL){
-       //printblockdetails(curr);
         size_t freeblocksize  = GETSIZEFROMHEADER(curr);
-     
-       // printf("f");
-        //assert(freeblocksize%ALIGNMENT == 0);
         long int cmp = (long int) freeblocksize - size;
         if (cmp >= 0){
-           // assert(curr!= NULL);
            COPYPREVIOUS(temp3,curr);
-                assert (temp3!= NULL);
-           assert(curr!= mm_head);
+          void * xyz = 0;
+          COPYPREVIOUS(xyz,curr);
             delete_from_free_list(curr);
             size_t minsize = MINSIZE;
             size_t remaining = freeblocksize - size;
             long int c = (long int)remaining - minsize;
             if (c >= 0){
-                
-                //curr has free block. sset the size set the allocate bi in header and footer
-                
-                
                 SETALLOCATEBIT(size);
                 PUTSIZEINHEADER(curr,size);
                 PUTSIZEINFOOTER(curr,size);
-                assert(remaining %ALIGNMENT== 0);
-                void * splittedfreeblock;
+                 void * splittedfreeblock;
                 splittedfreeblock = (char *) curr +(size&~0x1);
-                //now curr is pointing to the newly made free block
                 PUTSIZEINHEADER(splittedfreeblock,remaining);
                 PUTSIZEINFOOTER(splittedfreeblock, remaining);
-                insertfreelist(splittedfreeblock,mm_head);
-                //printblockdetails(splittedfreeblock);
+                insertfreelist(splittedfreeblock,xyz);
                 if (curr == mm_heap){
                     mm_heap = splittedfreeblock;
-                }
-                //exit(0);
-               //let us see we can place it in situ    
+                }  
                 return curr;        
             }
             else{
@@ -359,13 +267,209 @@ return NULL;
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- */
-void *mm_realloc(void *ptr, size_t size)
+ * 
+ * 
+ * void *mm_realloc(void *ptr, size_t payload)
 {
-    void *oldptr = ptr;
-    void *newptr;
+ 
+
+
+	if (memcmp(&size,&currentsize, sizeof(size_t) )<0){
+		
+	}
+ 	size_t physicalnextsize = *(size_t *)((char *)ptr +currentsize);
+	if ((physicalnextsize%2 == 0) &&((physicalnextsize+currentsize)>= size)){
+		size_t remaining = physicalnextsize+currentsize - size;
+		size_t blocksize = size;
+		size = size|0x1;
+		memcpy(ptr,&size, sizeof(size_t ));
+		memcpy(ptr+blocksize- SIZE_T_SIZE, &size, sizeof(size_t));
+		if (remaining > MINSIZE){
+			assert(remaining%2==0);
+			memcpy(ptr+blocksize,&remaining, sizeof(size_t)  );
+			memcpy(ptr +blocksize + remaining -SIZE_T_SIZE ,&remaining, sizeof(size_t));
+			insertfreelist(ptr + blocksize,mm_head);
+		}
+		return ptr;
+	}	
+	else{	void * newptr = mm_malloc(size);
+		if (newptr == NULL){
+		return  NULL;
+		}
+		memcpy(newptr,ptr,currentsize );
+		mm_free(ptr);
+		return newptr;
+	}  
+  	return ptr;} mm_heap take care
+ */
+void *mm_realloc(void *ptr, size_t payload)
+{
+//if you reallocate it to a new place, free the previous one
+    
+
+    if (ptr == NULL) return mm_malloc(payload);
+    if (payload == 0) {
+		mm_free(ptr);
+		return NULL;}
+     void * bp = ((char *)ptr - SIZE_T_SIZE );
+     size_t oldblocksize = GETSIZEFROMHEADER(bp);
+     size_t requestedsize = ALIGN(payload+2*SIZE_T_SIZE);
+     long int realloc1 = (long int) requestedsize-oldblocksize;
+     long int  splittingrequired = (long int) oldblocksize-requestedsize-MINSIZE;
+    if ((bp == mm_heap)&& realloc1 >=0){
+        //lastblock and size required ismore than available
+        long int extendsize =(long int) realloc-SIZE_T_SIZE;
+        if (extendsize >0){
+        void * t = mem_sbrk(extendsize);
+        requestedsize = (requestedsize|0x1);
+         PUTSIZEINHEADER(bp, requestedsize);
+        PUTSIZEINFOOTER(bp,requestedsize);
+        }
+        return ptr;
+    }
+    else if ((bp == mm_heap)&& realloc1 <0){
+        // lastblock and size required
+        if (splittingrequired >0){
+            //last block splitting
+
+        }
+        //cannot reduce heapsize
+        //split free block
+        return ptr;
+    }
+    else if (realloc1 >=0) {
+        // check whether next physical block is free. 
+        /*if yes:
+            check whether next physical block is mm_heap:
+            set (mm_ heap to current  pointer - SIZE_T_SIZE)
+               if yes: colaesce these blocks and see if we can split it again
+                       set header and footer if we can split: change mm-heap to this new block
+                no: ???*/
+    //copy its data to new place and mm_free and mm_malloc and insert this data into new malloc
+    else{//reuqested size is less than the current block size:
+        /*reset the sizes in header and footer and split a new block;
+*/
+    }
+
+
+        /*//it is not the last block and reallocation is required
+        
+
+
+
+
+        No:
+        if both requested and old both are equal , return ptr
+        //if next block is free, and its next block is not free
+        //
+
+      
+
+ are equal 
+*/
+  
+
+
+    }
+    //now it was not the 
+    /*
+     long int checkmin= (long int) size -minsize;
+     void * newptr;
+     size_t minsize = MINSIZE;
+     
+     void * newptr;
+     size_t minsize = MINSIZE;
+     size_t requestedsize = ALIGN(payload+2*SIZE_T_SIZE);
+    long int checkmin= (long int) size -minsize;
+    if (checkmin <0) requestedsize = minsize;
+     
+     long int realloc = (long int) requestedsize-oldblocksize;
+    
+    if (realloc <=0){
+        long int  c = (long int) oldblocksize-requestedsize-MINSIZE;
+        if (c <0){
+            return *ptr;
+        }
+        else{//we have to split it
+            size_t remainingfree = oldblocksize- requestedsize;
+            //        mm_heap
+        //  size_t blockoffset = requestedsize;
+            SETALLOCATEBIT(requestedsize);
+            PUTSIZEINHEADER(bp, requestedsize);
+            PUTSIZEINFOOTER(bp,requestedsize);
+            void * splittedfreeblock = 0;
+            splittedfreeblock = (char *) bp + (requestedsize&~0x1);
+            PUTSIZEINHEADER(splittedfreeblock,remainingfree);
+            PUTSIZEINFOOTER(splittedfreeblock, remainingfree);
+            insertfreelist(splittedfreeblock, mm_head);
+    }
+/* our code newver
+ void * splittedfreeblock;
+                splittedfreeblock = (char *) curr +(size&~0x1);
+                PUTSIZEINHEADER(splittedfreeblock,remaining);
+                PUTSIZEINFOOTER(splittedfreebremaininglock, remaining);
+                insertfreelist(splittedfreeblock,xyz);
+                if (curr == mm_heap){
+                    mm_heap = splittedfreeblock;
+                }  
+                return curr;      
+b
+*/
+    
+
+
+        /*size_t remaining = currentsize - size;
+		size = size|0x1;
+		size_t newsize = size&~0x1;
+		memcpy(ptr,&size, sizeof(size_t));
+		memcpy(ptr+newsize- SIZE_T_SIZE, &size, sizeof(size_t));
+		size = size&~0x1;
+		if (remaining >= MINSIZE){
+			memcpy(ptr+newsize,&remaining, sizeof(size_t)  );
+			memcpy(ptr +currentsize -SIZE_T_SIZE ,&remaining, sizeof(size_t));
+			insertfreelist((ptr+newsize), mm_head);
+		}
+		return ptr;*/
+    }
+   
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     size_t copySize;
     
+
+
+
+
+
+
+
+
+
+
+
     newptr = mm_malloc(size);
     if (newptr == NULL)
       return NULL;
