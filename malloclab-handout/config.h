@@ -1,9 +1,7 @@
 #ifndef __CONFIG_H_
 #define __CONFIG_H_
 
-/*,\
-  "realloc-bal.rep",\
-  "realloc2-bal.rep"
+/*
  * config.h - malloc lab configuration file
  *
  * Copyright (c) 2002, R. Bryant and D. O'Hallaron, All rights reserved.
@@ -32,7 +30,9 @@
   "random-bal.rep",\
   "random2-bal.rep",\
   "binary-bal.rep",\
-  "binary2-bal.rep"
+  "binary2-bal.rep",\
+  "realloc-bal.rep",\
+  "realloc2-bal.rep"
 
 /*
  * This constant gives the estimated performance of the libc malloc

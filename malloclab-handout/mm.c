@@ -14,18 +14,15 @@ team_t team = {
 };
 #define ALIGNMENT 8
 #define IS_ALIGNED(p)  ((((unsigned int)(p)) % ALIGNMENT) == 0)
-
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 #define MINSIZE (2*SIZE_T_SIZE +2* ALIGN(sizeof(void *)))
 #define PUTSIZEINHEADER(bp,size) ((((size_t *)(bp)))[0] = (size))
 #define GETSIZEFROMHEADER(bp) (*(size_t *)((char* )bp))
 #define PUTSIZEINFOOTER(bp,size) (((size_t *)((char* )bp+(size&~0x1)-SIZE_T_SIZE))[0] = (size))
-//#define GETSIZEFROMFOOTER(bp) (*(size_t *)((char* )bp-SIZE_T_SIZE))
 #define SETALLOCATEBIT(size) (size|= 0x1)
 #define COPYNEXT(dest,src) ((dest)= *(size_t *)  ((char *)src+SIZE_T_SIZE + ALIGN(sizeof(void *)))) 
 #define COPYPREVIOUS(dest,src) ((dest)=  *(size_t *)((char *)src+SIZE_T_SIZE ))
-//may change to double star in next two
 #define SETNEXT(dest,src) (*(size_t *)((char *)(dest) +SIZE_T_SIZE + ALIGN(sizeof(void *))) =(src))
 #define SETPREVIOUS(dest,src) (*(size_t *)((char *)(dest) +SIZE_T_SIZE ) = (src))
 int mm_init(void);
@@ -33,45 +30,11 @@ void * mm_malloc(size_t);
 void mm_free(void *);
 static char * mm_heap;
 static char *mm_head;
-static int colaescingkitnibaar;
 void *mm_realloc(void *, size_t);
 void insertfreelist(void *bp, void * start);
 void delete_from_free_list(void *bp);
 void * search_free_block(size_t); 
-int numfreelist(void){
-    void * curr = 0;
-    int i = 0;
-    COPYNEXT(curr,mm_head);
-    while (curr!= NULL){
-        i++;
-        void * temp = 0;
-        COPYNEXT(temp,curr);
-        curr = temp;
-    }
-    return i;
-}
-/*void printblockdetails(void * bp){
-    printf("SIZE FROM HEADER %u\n",GETSIZEFROMHEADER(bp));
-    printf("SIZE FROM FOOTER %u\n",*(size_t *)((char *)bp + (GETSIZEFROMHEADER(bp) &~0x1)- SIZE_T_SIZE));
-    printf("BLOCK ADDRESS %u\n",bp);
-    printf("PREVIOUS POINTER %u\n",*(size_t *)(bp + SIZE_T_SIZE ));
-    printf("NEXT POINTER %u\n",*(size_t *)(bp + SIZE_T_SIZE + ALIGN(sizeof(void *))));
-    //assert(    );
-    //assert((*(size_t *)(bp + SIZE_T_SIZE + ALIGN(sizeof(void *))))%ALIGNMENT==0);
-    return;}*/
-    /*void printfreeblocks(){
-    void * start = mm_head;
-    void * curr;
-    COPYNEXT(curr,start);
-    while (curr!= NULL){
 
-         printf("BLOCK ADDRESS %u\n",curr);
-        //printblockdetails(curr);
-        COPYNEXT(curr,curr);
-    }
-    return;
-
-} */
 int mm_init(void)
 {   
      mm_heap = 0;
@@ -87,8 +50,7 @@ int mm_init(void)
 	return 0;
 }
 void *mm_malloc(size_t payload)
-{ 
-  
+{   
     size_t size = ALIGN(payload)+2*SIZE_T_SIZE;
      long int a = (long int) size- MINSIZE;
 	if (a<0) size  = MINSIZE;
@@ -99,7 +61,6 @@ void *mm_malloc(size_t payload)
     bp = mem_sbrk(size);
     if (bp == (void *)-1)	return NULL;
     SETALLOCATEBIT(size);
-    //assert(size%2 != 0);
     PUTSIZEINHEADER(bp,size);
     PUTSIZEINFOOTER(bp,size);
     mm_heap = bp;
@@ -221,12 +182,12 @@ void delete_from_free_list(void *bp){
 void * search_free_block(size_t size){
     void * curr;
     COPYNEXT(curr, mm_head);
-    void * temp3 = 0;
+    //void * temp3 = 0;
     while (curr!= NULL){
         size_t freeblocksize  = GETSIZEFROMHEADER(curr);
         long int cmp = (long int) freeblocksize - size;
         if (cmp >= 0){
-           COPYPREVIOUS(temp3,curr);
+          
           void * xyz = 0;
           COPYPREVIOUS(xyz,curr);
             delete_from_free_list(curr);
@@ -273,14 +234,9 @@ void *mm_realloc(void *ptr, size_t payload)
      void * bp = ((char *)ptr - SIZE_T_SIZE );
      size_t blocksize = GETSIZEFROMHEADER(bp);//it is the currentblock
      blocksize= (blocksize &(~0x1));
-     
-     printf("blocksize = %u\n", blocksize);
-     size_t requestedsize = ALIGN(payload)+2*SIZE_T_SIZE;//which user has asked for
-     printf("requestedsize %u\n", requestedsize);
+     size_t requestedsize = ALIGN(payload)+2*SIZE_T_SIZE;//which user has asked fo
      long int realloc1 = (long int) requestedsize-blocksize;
-     printf("realloc1 %ld\n", realloc1);
     if ((bp == mm_heap)&& realloc1 >0){
-        //assert(1==2);
         size_t extendsize = (size_t) realloc1;
         void * t = mem_sbrk(extendsize);
         requestedsize = (requestedsize|0x1);
@@ -289,7 +245,6 @@ void *mm_realloc(void *ptr, size_t payload)
         return ptr;
     }
     else if ((bp == mm_heap)&& realloc1 == 0){
-       // assert(3==4);
         return ptr;}
     
     else if ((bp ==mm_heap )&&(realloc1 <0)) {
