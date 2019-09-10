@@ -318,26 +318,28 @@ void *mm_realloc(void *ptr, size_t payload)
      long int  splittingrequired = (long int) oldblocksize-requestedsize-MINSIZE;
     if ((bp == mm_heap)&& realloc1 >=0){
         //lastblock and size required ismore than available
-        long int extendsize =(long int) realloc-SIZE_T_SIZE;
+        long int extendsize =(long int) realloc1-SIZE_T_SIZE;
         if (extendsize >0){
         void * t = mem_sbrk(extendsize);
         requestedsize = (requestedsize|0x1);
-         PUTSIZEINHEADER(bp, requestedsize);
+        PUTSIZEINHEADER(bp, requestedsize);
         PUTSIZEINFOOTER(bp,requestedsize);
         }
         return ptr;
     }
-    else if ((bp == mm_heap)&& realloc1 <0){
+    else if ((bp == mm_heap)&& realloc1 < 0){
         // lastblock and size required
+        //IMP:if the block to be splitted is greater than minsize then split the block else do not split! 
         if (splittingrequired >0){
             //last block splitting
-
+                  
         }
         //cannot reduce heapsize
         //split free block
         return ptr;
     }
     else if (realloc1 >=0) {
+        //R->Why dont we free the curernt block and then call malloc function again.That would take care to of all the cases!Think about it!
         // check whether next physical block is free. 
         /*if yes:
             check whether next physical block is mm_heap:
@@ -345,10 +347,14 @@ void *mm_realloc(void *ptr, size_t payload)
                if yes: colaesce these blocks and see if we can split it again
                        set header and footer if we can split: change mm-heap to this new block
                 no: ???*/
+    }
     //copy its data to new place and mm_free and mm_malloc and insert this data into new malloc
     else{//reuqested size is less than the current block size:
         /*reset the sizes in header and footer and split a new block;
+        
 */
+
+
     }
 
 
@@ -370,7 +376,7 @@ void *mm_realloc(void *ptr, size_t payload)
   
 
 
-    }
+    
     //now it was not the 
     /*
      long int checkmin= (long int) size -minsize;
