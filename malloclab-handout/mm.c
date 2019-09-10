@@ -42,6 +42,19 @@ void printblockdetails(void * bp){
     printf("PREVIOUS POINTER %u\n",*(char **)(bp + SIZE_T_SIZE ));
     printf("NEXT POINTER %u\n",*(char **)(bp + SIZE_T_SIZE + ALIGN(sizeof(void *))));
     return;}
+void printfreeblocks(){
+    void * start = mm_head;
+    void * curr;
+    COPYNEXT(curr,start);
+    while (curr!= NULL){
+
+         printf("BLOCK ADDRESS %u\n",curr);
+        //printblockdetails(curr);
+        COPYNEXT(curr,curr);
+    }
+    return;
+
+} 
 static int index1malloc;
 static int index2free;
 int mm_init(void)
@@ -52,8 +65,10 @@ int mm_init(void)
     mm_heap = 0;
     mm_head =mem_sbrk(MINSIZE);
     size_t minsize = MINSIZE|0x1;
-   *(size_t *)(mm_head) = minsize;
-   *(size_t *)((char* )mm_head+MINSIZE-SIZE_T_SIZE) = minsize;
+    PUTSIZEINHEADER(mm_head,minsize);
+    PUTSIZEINFOOTER(mm_head,minsize);
+   //*(size_t *)(mm_head) = minsize;
+   //*(size_t *)((char* )mm_head+MINSIZE-SIZE_T_SIZE) = minsize;
       char * X = 0;
    SETNEXT(mm_head, X);
    SETPREVIOUS(mm_head,X);  
@@ -61,17 +76,25 @@ int mm_init(void)
    COPYNEXT(tempnext, mm_head);
     void * tempprev= -1;
     COPYPREVIOUS(tempprev, mm_head);
+    //printf("temporary pointers are %u %u \n", tempnext,tempprev);
+    //printblockdetails(mm_head);
+    //exit(0);
     mm_heap = mm_head;
 	return 0;
 }
 void *mm_malloc(size_t payload)
-{
+{   /*if (index1malloc == 3){
+
+        printfreeblocks();
+        exit(0);
+    }*/
+    index1malloc ++;
     size_t size = ALIGN(payload)+2*SIZE_T_SIZE;
     long int a = (long int) size- MINSIZE;
 	if (a<0) size  = MINSIZE;
     void * bp;
-   // bp = search_free_block(size);
-   //  if (bp!= NULL) return (char *)bp+SIZE_T_SIZE;
+    bp = search_free_block(size);
+     if (bp!= NULL) return (char *)bp+SIZE_T_SIZE;
     bp = mem_sbrk(size);
     if (bp == (void *)-1)	return NULL;
     SETALLOCATEBIT(size);
@@ -176,11 +199,11 @@ void insertfreelist(void * bp, void *head){
     
      if(nexttohead==NULL){// it is the first node of free list 
         //SETNEXT(head,bp);
-        printf("next to head is  %u\n", nexttohead);
+       // printf("next to head is  %u\n", nexttohead);
         //SETPREVIOUS(bp,head);
         SETNEXT(head,bp);
         //*(size_t *)((char *)head +SIZE_T_SIZE + ALIGN(sizeof(void *))) =bp;
-       *(size_t *)((char *)bp +SIZE_T_SIZE ) = head;
+      // *(size_t *)((char *)bp +SIZE_T_SIZE ) = head;
        SETPREVIOUS(bp,head);
        SETNEXT(bp, NULL);
          //*(size_t *)(((char *)bp+SIZE_T_SIZE+ALIGN(sizeof(void *)))) = NULL;
@@ -223,31 +246,32 @@ void * search_free_block(size_t size){
     void * curr;
     COPYNEXT(curr, mm_head);
     while (curr!= NULL){
+       // printblockdetails(curr);
         size_t freeblocksize  = GETSIZEFROMHEADER(curr);
-        assert(freeblocksize%ALIGNMENT != 0);
+        //assert(freeblocksize%ALIGNMENT != 0);
         long int cmp = (long int) freeblocksize - size;
         if (cmp >= 0){
             size_t minsize = MINSIZE;
             size_t remaining = freeblocksize - size;
             long int c = (long int)remaining - minsize;
             if (c >= 0){
-                void * prev;
-				void * next;
-                COPYPREVIOUS(prev, curr);
-                COPYNEXT(next,curr);
-                SETNEXT(prev,next);
-                SETPREVIOUS(next,prev);
+                
                 //curr has free block. sset the size set the allocate bi in header and footer
+                
+                delete_from_free_list(curr);
                 SETALLOCATEBIT(size);
                 PUTSIZEINHEADER(curr,size);
                 PUTSIZEINFOOTER(curr,size);
                 assert(remaining %ALIGNMENT== 0);
                 void * splittedfreeblock;
-                curr = (char *) curr +size;
+                splittedfreeblock = (char *) curr +(size&~0x1);
                 //now curr is pointing to the newly made free block
-                PUTSIZEINHEADER(curr,remaining);
-                PUTSIZEINFOOTER(curr, remaining);
-                insertfreelist(curr,prev);
+                PUTSIZEINHEADER(splittedfreeblock,remaining);
+                PUTSIZEINFOOTER(splittedfreeblock, remaining);
+                insertfreelist(splittedfreeblock,mm_head);
+                printblockdetails(splittedfreeblock);
+                
+                //exit(0);
                //let us see we can place it in situ    
                 return curr;        
             }
@@ -288,3 +312,15 @@ void *mm_realloc(void *ptr, size_t size)
     mm_free(oldptr);
     return newptr;
 }
+
+
+
+/*
+
+void * prev;
+				void * next;
+                COPYPREVIOUS(prev, curr);
+                COPYNEXT(next,curr);
+                SETNEXT(prev,next);
+                if (next!= NULL)         SETPREVIOUS(next,prev);
+*/
