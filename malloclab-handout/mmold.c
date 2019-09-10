@@ -233,7 +233,25 @@ void * search_free_list(size_t size){
 				size_t step = freeblocksize &~0x1;
 				memcpy(curr, &size, sizeof(size_t));
 				memcpy(curr+ step - SIZE_T_SIZE, &size,sizeof(size_t));
-				return curr;
+				return cvoid * curr ;
+	setnextfree(&curr,mm_head);
+	int i = 0;
+	//assert((size>=MINSIZE) &&(size%ALIGNMENT == 0));
+	while(curr!= NULL){
+		printf(" \nwhich free blocks(2056)  %u what size(3040-3056) %u\n ",GETSIZEHEADER(curr), size );
+
+		if (memcmp(curr, &size,sizeof(size_t))>=0){
+			printf("hi what is up\n");
+			size_t freeblocksize = GETSIZEHEADER(curr);
+			//assert(1==2);
+			//if (freeblocksize < size){
+			//	return NULL;
+			//}
+			size_t minsize = MINSIZE;
+			size_t temp2 = freeblocksize - size; 
+			
+			if (memcmp(&temp2, &minsize, sizeof(size_t))>=0){
+				void urr;
 			}
 		}
 		void * temp;
