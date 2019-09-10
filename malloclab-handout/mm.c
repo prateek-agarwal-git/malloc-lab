@@ -262,101 +262,124 @@ void * search_free_block(size_t size){
 
     }
 return NULL;
-
 }
-
-/*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- * 
- * 
- * void *mm_realloc(void *ptr, size_t payload)
-{
- 
-
-
-	if (memcmp(&size,&currentsize, sizeof(size_t) )<0){
-		
-	}
- 	size_t physicalnextsize = *(size_t *)((char *)ptr +currentsize);
-	if ((physicalnextsize%2 == 0) &&((physicalnextsize+currentsize)>= size)){
-		size_t remaining = physicalnextsize+currentsize - size;
-		size_t blocksize = size;
-		size = size|0x1;
-		memcpy(ptr,&size, sizeof(size_t ));
-		memcpy(ptr+blocksize- SIZE_T_SIZE, &size, sizeof(size_t));
-		if (remaining > MINSIZE){
-			assert(remaining%2==0);
-			memcpy(ptr+blocksize,&remaining, sizeof(size_t)  );
-			memcpy(ptr +blocksize + remaining -SIZE_T_SIZE ,&remaining, sizeof(size_t));
-			insertfreelist(ptr + blocksize,mm_head);
-		}
-		return ptr;
-	}	
-	else{	void * newptr = mm_malloc(size);
-		if (newptr == NULL){
-		return  NULL;
-		}
-		memcpy(newptr,ptr,currentsize );
-		mm_free(ptr);
-		return newptr;
-	}  
-  	return ptr;} mm_heap take care
- */
 void *mm_realloc(void *ptr, size_t payload)
 {
-//if you reallocate it to a new place, free the previous one
-    
 
     if (ptr == NULL) return mm_malloc(payload);
     if (payload == 0) {
 		mm_free(ptr);
 		return NULL;}
      void * bp = ((char *)ptr - SIZE_T_SIZE );
-     size_t oldblocksize = GETSIZEFROMHEADER(bp);
-     size_t requestedsize = ALIGN(payload+2*SIZE_T_SIZE);
-     long int realloc1 = (long int) requestedsize-oldblocksize;
-     long int  splittingrequired = (long int) oldblocksize-requestedsize-MINSIZE;
-    if ((bp == mm_heap)&& realloc1 >=0){
-        //lastblock and size required ismore than available
-        long int extendsize =(long int) realloc1-SIZE_T_SIZE;
-        if (extendsize >0){
+     size_t blocksize = GETSIZEFROMHEADER(bp);//it is the currentblock
+     blocksize= (blocksize &(~0x1));
+     
+     printf("blocksize = %u\n", blocksize);
+     size_t requestedsize = ALIGN(payload)+2*SIZE_T_SIZE;//which user has asked for
+     printf("requestedsize %u\n", requestedsize);
+     long int realloc1 = (long int) requestedsize-blocksize;
+     printf("realloc1 %ld\n", realloc1);
+    if ((bp == mm_heap)&& realloc1 >0){
+        //assert(1==2);
+        size_t extendsize = (size_t) realloc1;
         void * t = mem_sbrk(extendsize);
         requestedsize = (requestedsize|0x1);
         PUTSIZEINHEADER(bp, requestedsize);
         PUTSIZEINFOOTER(bp,requestedsize);
-        }
         return ptr;
     }
-    else if ((bp == mm_heap)&& realloc1 < 0){
-        // lastblock and size required
-        //IMP:if the block to be splitted is greater than minsize then split the block else do not split! 
-        if (splittingrequired >0){
-            //last block splitting
-                  
+    else if ((bp == mm_heap)&& realloc1 == 0){
+       // assert(3==4);
+        return ptr;}
+    
+    else if ((bp ==mm_heap )&&(realloc1 <0)) {
+        //assert(5==6);
+        size_t remainingfree = blocksize - requestedsize;
+        long int splittingrequired = (long int) remainingfree - MINSIZE;
+         if (splittingrequired>= 0){
+                SETALLOCATEBIT(requestedsize);
+                PUTSIZEINHEADER(bp,requestedsize);
+                PUTSIZEINFOOTER(bp,requestedsize);
+                 void * splittedfreeblock;
+                splittedfreeblock = (char *) bp +(requestedsize&~0x1);
+                PUTSIZEINHEADER(splittedfreeblock,remainingfree);
+                PUTSIZEINFOOTER(splittedfreeblock, remainingfree);
+                insertfreelist(splittedfreeblock,mm_head);
+                mm_heap = splittedfreeblock;
+         }              
+            return ptr;
+    }
+    else if(realloc1>=0) {
+        //assert(7==8);
+        void * physicalnextblock = 0;
+        physicalnextblock = (char *)bp + blocksize;
+        size_t physicalnextsize = GETSIZEFROMHEADER(physicalnextblock);
+            size_t nextoccupied = physicalnextsize& 0x1;
+            long int check = (long int)requestedsize - blocksize- (physicalnextsize&~0x1); 
+            long int splittingrequired = (long int) check - MINSIZE;
+        if ((nextoccupied)||(check <0)){
+           // assert(15==16);
+            //either next is occupied or does not have the space
+            void *oldptr = ptr;
+             void * newptr = mm_malloc(payload);
+            size_t oldpayload = blocksize - 2*SIZE_T_SIZE;
+             memcpy(newptr, oldptr, oldpayload);
+             mm_free(oldptr);
+             return newptr;
         }
-        //cannot reduce heapsize
-        //split free block
-        return ptr;
-    }
-    else if (realloc1 >=0) {
-        //R->Why dont we free the curernt block and then call malloc function again.That would take care to of all the cases!Think about it!
-        // check whether next physical block is free. 
-        /*if yes:
-            check whether next physical block is mm_heap:
-            set (mm_ heap to current  pointer - SIZE_T_SIZE)
-               if yes: colaesce these blocks and see if we can split it again
-                       set header and footer if we can split: change mm-heap to this new block
-                no: ???*/
-    }
-    //copy its data to new place and mm_free and mm_malloc and insert this data into new malloc
-    else{//reuqested size is less than the current block size:
-        /*reset the sizes in header and footer and split a new block;
+        else if (splittingrequired  <0 ){
+            //assert(17==18);
+            size_t size2 = blocksize+ (physicalnextsize&~0x1);
+            SETALLOCATEBIT(size2);
+            PUTSIZEINHEADER(bp,size2);
+            PUTSIZEINFOOTER(bp,size2);
+            if (physicalnextblock == mm_heap){
+                mm_heap  = bp;
+               
+            }
+             return ptr;
+        }
+        else{//check>0          
         
-*/
-
+                SETALLOCATEBIT(requestedsize);
+                PUTSIZEINHEADER(bp,requestedsize);
+                PUTSIZEINFOOTER(bp,requestedsize);
+                 void * splittedfreeblock;
+                splittedfreeblock = (char *) bp +(requestedsize&~0x1);
+                size_t remainingfree =(size_t)check ;
+                PUTSIZEINHEADER(splittedfreeblock,remainingfree);
+                PUTSIZEINFOOTER(splittedfreeblock, remainingfree);
+                insertfreelist(splittedfreeblock,mm_head);
+                if (physicalnextblock == mm_heap){
+                mm_heap  = splittedfreeblock;} 
+            return ptr;
+        }    
+        }
+        
+    
+    else{// may require splitting
+        //assert(9==10);
+        size_t remainingfree = blocksize - requestedsize;
+        
+        long int splittingrequired = (long int) remainingfree - MINSIZE;
+         if (splittingrequired>= 0){
+                SETALLOCATEBIT(requestedsize);
+                PUTSIZEINHEADER(bp,requestedsize);
+                PUTSIZEINFOOTER(bp,requestedsize);
+                 void * splittedfreeblock;
+                splittedfreeblock = (char *) bp +(requestedsize&~0x1);
+                //size_t remainingfree = (size_t)
+                PUTSIZEINHEADER(splittedfreeblock,remainingfree);
+                PUTSIZEINFOOTER(splittedfreeblock, remainingfree);
+                insertfreelist(splittedfreeblock,mm_head);
+                //mm_heap = splittedfreeblock;
+         }       
+                
+            return ptr;
 
     }
-
+    
+    return ptr;}
 
         /*//it is not the last block and reallocation is required
         
@@ -377,66 +400,6 @@ void *mm_realloc(void *ptr, size_t payload)
 
 
     
-    //now it was not the 
-    /*
-     long int checkmin= (long int) size -minsize;
-     void * newptr;
-     size_t minsize = MINSIZE;
-     
-     void * newptr;
-     size_t minsize = MINSIZE;
-     size_t requestedsize = ALIGN(payload+2*SIZE_T_SIZE);
-    long int checkmin= (long int) size -minsize;
-    if (checkmin <0) requestedsize = minsize;
-     
-     long int realloc = (long int) requestedsize-oldblocksize;
-    
-    if (realloc <=0){
-        long int  c = (long int) oldblocksize-requestedsize-MINSIZE;
-        if (c <0){
-            return *ptr;
-        }
-        else{//we have to split it
-            size_t remainingfree = oldblocksize- requestedsize;
-            //        mm_heap
-        //  size_t blockoffset = requestedsize;
-            SETALLOCATEBIT(requestedsize);
-            PUTSIZEINHEADER(bp, requestedsize);
-            PUTSIZEINFOOTER(bp,requestedsize);
-            void * splittedfreeblock = 0;
-            splittedfreeblock = (char *) bp + (requestedsize&~0x1);
-            PUTSIZEINHEADER(splittedfreeblock,remainingfree);
-            PUTSIZEINFOOTER(splittedfreeblock, remainingfree);
-            insertfreelist(splittedfreeblock, mm_head);
-    }
-/* our code newver
- void * splittedfreeblock;
-                splittedfreeblock = (char *) curr +(size&~0x1);
-                PUTSIZEINHEADER(splittedfreeblock,remaining);
-                PUTSIZEINFOOTER(splittedfreebremaininglock, remaining);
-                insertfreelist(splittedfreeblock,xyz);
-                if (curr == mm_heap){
-                    mm_heap = splittedfreeblock;
-                }  
-                return curr;      
-b
-*/
-    
-
-
-        /*size_t remaining = currentsize - size;
-		size = size|0x1;
-		size_t newsize = size&~0x1;
-		memcpy(ptr,&size, sizeof(size_t));
-		memcpy(ptr+newsize- SIZE_T_SIZE, &size, sizeof(size_t));
-		size = size&~0x1;
-		if (remaining >= MINSIZE){
-			memcpy(ptr+newsize,&remaining, sizeof(size_t)  );
-			memcpy(ptr +currentsize -SIZE_T_SIZE ,&remaining, sizeof(size_t));
-			insertfreelist((ptr+newsize), mm_head);
-		}
-		return ptr;*/
-    }
    
     
     
@@ -455,46 +418,11 @@ b
     
     
     
+    //if you reallocate it to a new place, free the previous one
+    
+
     
     
     
     
     
-    
-    
-    
-    size_t copySize;
-    
-
-
-
-
-
-
-
-
-
-
-
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
-}
-
-
-
-/*
-
-void * prev;
-				void * next;
-                COPYPREVIOUS(prev, curr);
-                COPYNEXT(next,curr);
-                SETNEXT(prev,next);
-                if (next!= NULL)         SETPREVIOUS(next,prev);
-*/

@@ -103,9 +103,6 @@ static char *default_tracefiles[] = {
 };
 
 
-/********************* 
- * Function prototypes 
- *********************/
 
 /* these functions manipulate range lists */
 static int add_range(range_t **ranges, char *lo, int size, 
@@ -602,6 +599,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
         switch (trace->ops[i].type) {
 
         case ALLOC: /* mm_malloc */
+		 printf("line number in file %d \n",i );
 		//printf("line number in file %d \n",i );
 	    /* Call the student's malloc */
 	    if ((p = mm_malloc(size)) == NULL) {
@@ -632,6 +630,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
         case REALLOC: /* mm_realloc */
 	   // printf("line number in file from realloc %d \n",i );
 	    /* Call the student's realloc */
+		 printf("line number in file %d \n",i );
 	    oldp = trace->blocks[index];
 	    if ((newp = mm_realloc(oldp, size)) == NULL) {
 		malloc_error(tracenum, i, "mm_realloc failed.");
@@ -670,7 +669,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
 	    
 	    /* Remove region from list and call student's free function */
 	    p = trace->blocks[index];
-	 // printf("line number in file %d \n",i );
+	  printf("line number in file %d \n",i );
 		//printf("size of the block to be freed in mdriver = %zu\n",*(size_t *)((char *)p- SIZE_T_SIZE));
 	    remove_range(ranges, p);
 	    mm_free(p);
